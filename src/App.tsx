@@ -1,26 +1,52 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+// src/App.tsx
+import { Route, Routes } from 'react-router-dom';
+import ProtectedRoute from './components/ProtectedRoute';
+import Layout from './components/Layout';
+import Login from './pages/Login';
 
-function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+// páginas
+import ProductsList from './pages/ProductsList';
+import ProductForm from './pages/ProductForm';
+import Ingresos from './pages/Ingresos';
+import Despachos from './pages/Despacho';
+import Movimientos from './pages/Movimientos';
+
+function NotFound() {
+  return <div style={{ padding: 16 }}>Página no encontrada</div>;
 }
 
-export default App;
+export default function App() {
+  return (
+    <Routes>
+      {/* público */}
+      <Route path="/login" element={<Login />} />
+
+      {/* protegido */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<div>Bienvenido a Casa Guflo</div>} />
+
+        {/* Inventario */}
+        <Route path="productos" element={<ProductsList />} />
+        <Route path="productos/:id" element={<ProductForm />} />
+
+        {/* Operaciones */}
+        <Route path="ingresos" element={<Ingresos />} />
+        <Route path="despachos" element={<Despachos />} />
+        <Route path="movimientos" element={<Movimientos />} />
+
+        {/* 404 dentro del layout */}
+        <Route path="*" element={<NotFound />} />
+      </Route>
+
+      {/* 404 fuera del layout (por si cae aquí) */}
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
