@@ -1,82 +1,93 @@
-import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import * as z from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import api from '../lib/api';
-import DataTable from '../components/DataTable';
-import { Producto } from '../types';
+import { useAuthStore } from '../store/auth';
+import { useNavigate } from 'react-router-dom';
 
-export default function ProductsList() {
-  const [items, setItems] = useState<Producto[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [qp, setQp] = useSearchParams();
+const schema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6),
+});
 
-  const page = Number(qp.get('page') || 1);
-  const pageSize = 10;
-  const q = qp.get('q') || '';
+type FormData = z.infer<typeof schema>;
 
-  const load = async () => {
-    setLoading(true);
-    const res = await api.get('/productos', { params: { page, pageSize, q } });
+export default function Login() {
+  const { register, handleSubmit, formState } = useForm<FormData>({
+    resolver: zodResolver(schema),
+  });
+  const login = useAuthStore((s) => s.login);
+  const navigate = useNavigate();
 
-    // Soporta backend real {items,total} o json-server (array + X-Total-Count)
-    const data = Array.isArray(res.data)
-      ? { items: res.data, total: Number(res.headers['x-total-count'] || res.data.length) }
-      : res.data;
-
-    setItems(data.items); setTotal(data.total);
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, [page, q]);
-
-  const del = async (id: number) => {
-    if (!window.confirm('¿Eliminar producto?')) return;
-    await api.delete(`/productos/${id}`);
-    load();
+  const onSubmit = async (data: FormData) => {
+    const res = await api.post('/auth/login', data);
+    login(res.data.accessToken, res.data.user);
+    navigate('/');
   };
 
   return (
-    <div style={{ display:'grid', gap:16 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <h1 style={{ fontSize:20, fontWeight:600 }}>Productos</h1>
-        <Link to="/productos/nuevo" style={{ background:'#000', color:'#fff', padding:'8px 12px', borderRadius:6 }}>Nuevo</Link>
-      </div>
-
-      <input
-        placeholder="Buscar..."
-        style={{ border:'1px solid #cbd5e1', borderRadius:6, padding:'8px 12px', maxWidth:260 }}
-        defaultValue={q}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') setQp({ page:'1', q:(e.target as HTMLInputElement).value });
-        }}
-      />
-
-      {loading ? <p>Cargando...</p> : (
-        <>
-          <DataTable
-            data={items}
-            keyField="id"
-            columns={[
-              { header:'SKU', cell:(r)=>r.sku },
-              { header:'Nombre', cell:(r)=>r.nombre },
-              { header:'Categoría', cell:(r)=>r.categoria },
-              { header:'UM', cell:(r)=>r.um },
-              { header:'Stock', cell:(r)=>r.stock },
-              { header:'Acciones', cell:(r)=>(
-                <div style={{ display:'flex', gap:8 }}>
-                  <Link to={`/productos/${r.id}`}>Editar</Link>
-                  <button style={{ color:'#dc2626' }} onClick={()=>del(r.id)}>Eliminar</button>
-                </div>
-              )},
-            ]}
+    <div
+      style={{
+        maxWidth: 420,
+        margin: '40px auto',
+        background: '#fff',
+        padding: 24,
+        borderRadius: 8,
+        border: '1px solid #e5e7eb',
+      }}
+    >
+      <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 12 }}>Iniciar sesión</h1>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        style={{ display: 'grid', gap: 12 }}
+      >
+        <div>
+          <label style={{ fontSize: 12 }}>Email</label>
+          <input
+            {...register('email')}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: '1px solid #cbd5e1',
+            }}
           />
-          <div style={{ display:'flex', alignItems:'center', gap:8, paddingTop:8 }}>
-            <button disabled={page<=1} onClick={()=>setQp({ page:String(page-1), q })} style={{ border:'1px solid #cbd5e1', padding:'4px 12px', borderRadius:6 }}>Anterior</button>
-            <span style={{ fontSize:12 }}>Página {page} · {total} total</span>
-            <button disabled={(page*pageSize)>=total} onClick={()=>setQp({ page:String(page+1), q })} style={{ border:'1px solid #cbd5e1', padding:'4px 12px', borderRadius:6 }}>Siguiente</button>
-          </div>
-        </>
-      )}
+          {formState.errors.email && (
+            <p style={{ color: '#dc2626', fontSize: 12 }}>
+              {String(formState.errors.email.message)}
+            </p>
+          )}
+        </div>
+        <div>
+          <label style={{ fontSize: 12 }}>Contraseña</label>
+          <input
+            type="password"
+            {...register('password')}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: '1px solid #cbd5e1',
+            }}
+          />
+          {formState.errors.password && (
+            <p style={{ color: '#dc2626', fontSize: 12 }}>
+              {String(formState.errors.password.message)}
+            </p>
+          )}
+        </div>
+        <button
+          disabled={formState.isSubmitting}
+          style={{
+            background: '#000',
+            color: '#fff',
+            padding: '8px 12px',
+            borderRadius: 6,
+          }}
+        >
+          Entrar
+        </button>
+      </form>
     </div>
   );
 }

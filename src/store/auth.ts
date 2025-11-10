@@ -1,6 +1,6 @@
 import { create } from 'zustand';
+import { User } from '../types';
 
-interface User { id: number; name: string; role: 'ADMIN'|'OPERADOR'; }
 interface AuthState {
   token: string | null;
   user: User | null;

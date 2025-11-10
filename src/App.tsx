@@ -4,11 +4,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 
-// páginas
 import ProductsList from './pages/ProductsList';
 import ProductForm from './pages/ProductForm';
 import Ingresos from './pages/Ingresos';
-import Despachos from './pages/Despacho';
+import Despachos from './pages/Despachos';
 import Movimientos from './pages/Movimientos';
 
 function NotFound() {
@@ -45,7 +44,7 @@ export default function App() {
         <Route path="*" element={<NotFound />} />
       </Route>
 
-      {/* 404 fuera del layout (por si cae aquí) */}
+      {/* 404 fuera del layout */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

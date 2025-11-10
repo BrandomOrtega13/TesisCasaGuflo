@@ -9,11 +9,13 @@ const schema = z.object({
   email: z.string().email(),
   password: z.string().min(6),
 });
+
 type FormData = z.infer<typeof schema>;
 
 export default function Login() {
-  const { register, handleSubmit, formState: { errors, isSubmitting } } =
-    useForm<FormData>({ resolver: zodResolver(schema) });
+  const { register, handleSubmit, formState } = useForm<FormData>({
+    resolver: zodResolver(schema),
+  });
   const login = useAuthStore((s) => s.login);
   const navigate = useNavigate();
 
@@ -24,24 +26,65 @@ export default function Login() {
   };
 
   return (
-    <div style={{ maxWidth:420, margin:'24px auto', background:'#fff', padding:24,
-      borderRadius:8, border:'1px solid #e5e7eb' }}>
-      <h1 style={{ fontSize:20, fontWeight:600, marginBottom:12 }}>Iniciar sesión</h1>
-      <form onSubmit={handleSubmit(onSubmit)} style={{ display:'grid', gap:12 }}>
+    <div
+      style={{
+        maxWidth: 420,
+        margin: '40px auto',
+        background: '#fff',
+        padding: 24,
+        borderRadius: 8,
+        border: '1px solid #e5e7eb',
+      }}
+    >
+      <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 12 }}>Iniciar sesión</h1>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        style={{ display: 'grid', gap: 12 }}
+      >
         <div>
-          <label style={{ display:'block', fontSize:12 }}>Email</label>
-          <input {...register('email')}
-            style={{ border:'1px solid #cbd5e1', borderRadius:6, width:'100%', padding:'8px 12px' }} />
-          {errors.email && <p style={{ color:'#dc2626', fontSize:12 }}>{String(errors.email.message)}</p>}
+          <label style={{ fontSize: 12 }}>Email</label>
+          <input
+            {...register('email')}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: '1px solid #cbd5e1',
+            }}
+          />
+          {formState.errors.email && (
+            <p style={{ color: '#dc2626', fontSize: 12 }}>
+              {String(formState.errors.email.message)}
+            </p>
+          )}
         </div>
         <div>
-          <label style={{ display:'block', fontSize:12 }}>Contraseña</label>
-          <input type="password" {...register('password')}
-            style={{ border:'1px solid #cbd5e1', borderRadius:6, width:'100%', padding:'8px 12px' }} />
-          {errors.password && <p style={{ color:'#dc2626', fontSize:12 }}>{String(errors.password.message)}</p>}
+          <label style={{ fontSize: 12 }}>Contraseña</label>
+          <input
+            type="password"
+            {...register('password')}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              borderRadius: 6,
+              border: '1px solid #cbd5e1',
+            }}
+          />
+          {formState.errors.password && (
+            <p style={{ color: '#dc2626', fontSize: 12 }}>
+              {String(formState.errors.password.message)}
+            </p>
+          )}
         </div>
-        <button disabled={isSubmitting}
-          style={{ background:'#000', color:'#fff', padding:'8px 12px', borderRadius:6 }}>
+        <button
+          disabled={formState.isSubmitting}
+          style={{
+            background: '#000',
+            color: '#fff',
+            padding: '8px 12px',
+            borderRadius: 6,
+          }}
+        >
           Entrar
         </button>
       </form>
