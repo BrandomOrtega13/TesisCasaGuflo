@@ -1,5 +1,5 @@
 // src/App.tsx
-import { Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -34,6 +34,7 @@ export default function App() {
         {/* Inventario */}
         <Route path="productos" element={<ProductsList />} />
         <Route path="productos/:id" element={<ProductForm />} />
+        <Route path="productos/nuevo" element={<ProductForm />} />
 
         {/* Operaciones */}
         <Route path="ingresos" element={<Ingresos />} />

@@ -1,8 +1,14 @@
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 
 export default function Layout() {
   const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', color: '#0f172a' }}>
@@ -20,12 +26,14 @@ export default function Layout() {
           <Link to="/" style={{ fontWeight: 700 }}>
             Casa Guflo
           </Link>
+
           <nav style={{ display: 'flex', gap: 16 }}>
             <NavLink to="/productos">Productos</NavLink>
             <NavLink to="/ingresos">Ingresos</NavLink>
             <NavLink to="/despachos">Despachos</NavLink>
             <NavLink to="/movimientos">Movimientos</NavLink>
           </nav>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {user && (
               <span style={{ fontSize: 12 }}>
@@ -33,7 +41,7 @@ export default function Layout() {
               </span>
             )}
             <button
-              onClick={logout}
+              onClick={handleLogout}
               style={{
                 fontSize: 12,
                 textDecoration: 'underline',
@@ -47,6 +55,7 @@ export default function Layout() {
           </div>
         </div>
       </header>
+
       <main style={{ maxWidth: 1200, margin: '0 auto', padding: 16 }}>
         <Outlet />
       </main>

@@ -1,93 +1,119 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import * as z from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
+import { useNavigate, useParams } from 'react-router-dom';
 import api from '../lib/api';
-import { useAuthStore } from '../store/auth';
-import { useNavigate } from 'react-router-dom';
 
-const schema = z.object({
-  email: z.string().email(),
-  password: z.string().min(6),
-});
+type FormData = {
+  sku: string;
+  nombre: string;
+  precio_compra?: number;
+  precio_venta?: number;
+  // luego podemos agregar categoria_id, proveedor_id, unidad_id
+};
 
-type FormData = z.infer<typeof schema>;
-
-export default function Login() {
-  const { register, handleSubmit, formState } = useForm<FormData>({
-    resolver: zodResolver(schema),
-  });
-  const login = useAuthStore((s) => s.login);
+export default function ProductForm() {
+  const { id } = useParams();
+  const isNew = !id || id === 'nuevo';
   const navigate = useNavigate();
 
+  const { register, handleSubmit, reset } = useForm<FormData>();
+
+  useEffect(() => {
+    const load = async () => {
+      if (!isNew && id) {
+        const res = await api.get(`/productos/${id}`);
+        reset({
+          sku: res.data.sku,
+          nombre: res.data.nombre,
+          precio_compra: res.data.precio_compra || 0,
+          precio_venta: res.data.precio_venta || 0,
+        });
+      }
+    };
+    load();
+  }, [id, isNew, reset]);
+
   const onSubmit = async (data: FormData) => {
-    const res = await api.post('/auth/login', data);
-    login(res.data.accessToken, res.data.user);
-    navigate('/');
+    if (isNew) {
+      await api.post('/productos', data);
+    } else if (id) {
+      await api.put(`/productos/${id}`, data);
+    }
+    navigate('/productos');
   };
 
   return (
     <div
       style={{
-        maxWidth: 420,
-        margin: '40px auto',
+        maxWidth: 480,
+        margin: '20px auto',
+        padding: 20,
         background: '#fff',
-        padding: 24,
         borderRadius: 8,
         border: '1px solid #e5e7eb',
       }}
     >
-      <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 12 }}>Iniciar sesión</h1>
+      <h2>{isNew ? 'Nuevo producto' : 'Editar producto'}</h2>
       <form
         onSubmit={handleSubmit(onSubmit)}
-        style={{ display: 'grid', gap: 12 }}
+        style={{ display: 'grid', gap: 12, marginTop: 16 }}
       >
         <div>
-          <label style={{ fontSize: 12 }}>Email</label>
+          <label>SKU</label>
           <input
-            {...register('email')}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-            }}
+            {...register('sku', { required: true })}
+            style={input}
           />
-          {formState.errors.email && (
-            <p style={{ color: '#dc2626', fontSize: 12 }}>
-              {String(formState.errors.email.message)}
-            </p>
-          )}
         </div>
         <div>
-          <label style={{ fontSize: 12 }}>Contraseña</label>
+          <label>Nombre</label>
           <input
-            type="password"
-            {...register('password')}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-            }}
+            {...register('nombre', { required: true })}
+            style={input}
           />
-          {formState.errors.password && (
-            <p style={{ color: '#dc2626', fontSize: 12 }}>
-              {String(formState.errors.password.message)}
-            </p>
-          )}
         </div>
+        <div>
+          <label>Precio compra</label>
+          <input
+            type="number"
+            step="0.01"
+            {...register('precio_compra')}
+            style={input}
+          />
+        </div>
+        <div>
+          <label>Precio venta</label>
+          <input
+            type="number"
+            step="0.01"
+            {...register('precio_venta')}
+            style={input}
+          />
+        </div>
+
         <button
-          disabled={formState.isSubmitting}
+          type="submit"
           style={{
+            marginTop: 8,
+            padding: '8px 12px',
             background: '#000',
             color: '#fff',
-            padding: '8px 12px',
             borderRadius: 6,
+            border: 'none',
+            cursor: 'pointer',
           }}
         >
-          Entrar
+          Guardar
         </button>
       </form>
     </div>
   );
 }
+
+const input: React.CSSProperties = {
+  width: '100%',
+  padding: '6px 10px',
+  borderRadius: 6,
+  border: '1px solid #cbd5e1',
+  fontSize: 14,
+};

@@ -2,6 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
 import authRoutes from './routes/auth.routes';
+import productosRoutes from './routes/productos.routes';
+import movimientosRoutes from './routes/movimientos.routes';
+import bodegasRoutes from './routes/bodegas.routes';
+import proveedoresRoutes from './routes/proveedores.routes';
+import clientesRoutes from './routes/clientes.routes';
 
 const app = express();
 
@@ -20,6 +25,11 @@ app.get('/', (_req, res) => {
 
 // Aquí montamos las rutas de autenticación
 app.use('/auth', authRoutes);
+app.use('/productos', productosRoutes);
+app.use('/bodegas', bodegasRoutes);
+app.use('/proveedores', proveedoresRoutes);
+app.use('/movimientos', movimientosRoutes);
+app.use('/clientes', clientesRoutes);
 
 // Puerto (usa el del .env o 4000 por defecto)
 const PORT = process.env.PORT || 4000;
