@@ -2,20 +2,15 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
-type ProductRow = {
+type Bodega = {
   id: string;
-  sku: string;
   nombre: string;
-  categoria?: string;
-  proveedor?: string;
-  unidad?: string;
-  stock?: number;
-  unidades_por_caja?: number | null;
+  direccion?: string;
 };
 
-export default function ProductsList() {
-  const [activos, setActivos] = useState<ProductRow[]>([]);
-  const [inactivos, setInactivos] = useState<ProductRow[]>([]);
+export default function BodegasList() {
+  const [activos, setActivos] = useState<Bodega[]>([]);
+  const [inactivos, setInactivos] = useState<Bodega[]>([]);
   const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -27,14 +22,14 @@ export default function ProductsList() {
     setMsg(null);
     try {
       const [aRes, iRes] = await Promise.all([
-        api.get('/productos'),
-        api.get('/productos/inactivos'),
+        api.get('/bodegas'),
+        api.get('/bodegas/inactivas'),
       ]);
       setActivos(aRes.data);
       setInactivos(iRes.data);
     } catch (err) {
       console.error(err);
-      setMsg('Error al cargar productos');
+      setMsg('Error al cargar bodegas');
     } finally {
       setLoading(false);
     }
@@ -45,23 +40,23 @@ export default function ProductsList() {
   }, []);
 
   const onDelete = async (id: string) => {
-    if (!window.confirm('¿Desactivar este producto?')) return;
+    if (!window.confirm('¿Desactivar esta bodega?')) return;
     try {
-      await api.delete(`/productos/${id}`);
+      await api.delete(`/bodegas/${id}`);
       load();
     } catch (err) {
       console.error(err);
-      setMsg('Error al desactivar producto');
+      setMsg('Error al desactivar bodega');
     }
   };
 
   const onReactivate = async (id: string) => {
     try {
-      await api.put(`/productos/${id}/reactivar`);
+      await api.put(`/bodegas/${id}/reactivar`);
       load();
     } catch (err) {
       console.error(err);
-      setMsg('Error al reactivar producto');
+      setMsg('Error al reactivar bodega');
     }
   };
 
@@ -77,7 +72,7 @@ export default function ProductsList() {
           alignItems: 'center',
         }}
       >
-        <h2>Productos</h2>
+        <h2>Bodegas</h2>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             type="button"
@@ -88,7 +83,7 @@ export default function ProductsList() {
               color: !showInactive ? '#fff' : '#111827',
             }}
           >
-            Activos
+            Activas
           </button>
           <button
             type="button"
@@ -99,16 +94,16 @@ export default function ProductsList() {
               color: showInactive ? '#fff' : '#111827',
             }}
           >
-            Inactivos
+            Inactivas
           </button>
 
           {!showInactive && (
             <button
               type="button"
-              onClick={() => navigate('/productos/nuevo')}
+              onClick={() => navigate('/bodegas/nuevo')}
               style={btnPrimary}
             >
-              + Nuevo producto
+              + Nueva bodega
             </button>
           )}
         </div>
@@ -130,43 +125,29 @@ export default function ProductsList() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
             <tr style={{ textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-              <th style={th}>SKU</th>
               <th style={th}>Nombre</th>
-              <th style={th}>Categoría</th>
-              <th style={th}>Proveedor</th>
-              <th style={th}>Unidad</th>
-              {!showInactive && <th style={th}>Stock</th>}
-              <th style={th}>Uds/caja</th>
+              <th style={th}>Dirección</th>
               <th style={th}>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((p) => (
-              <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={td}>{p.sku}</td>
-                <td style={td}>{p.nombre}</td>
-                <td style={td}>{p.categoria || '—'}</td>
-                <td style={td}>{p.proveedor || '—'}</td>
-                <td style={td}>{p.unidad || '—'}</td>
-                {!showInactive && <td style={td}>{p.stock ?? 0}</td>}
-                <td style={td}>
-                  {p.unidades_por_caja && p.unidades_por_caja > 0
-                    ? p.unidades_por_caja
-                    : '—'}
-                </td>
+            {rows.map((b) => (
+              <tr key={b.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                <td style={td}>{b.nombre}</td>
+                <td style={td}>{b.direccion || '—'}</td>
                 <td style={td}>
                   {!showInactive ? (
                     <>
                       <button
                         type="button"
-                        onClick={() => navigate(`/productos/${p.id}`)}
+                        onClick={() => navigate(`/bodegas/${b.id}`)}
                         style={linkBtn}
                       >
                         Editar
                       </button>
                       <button
                         type="button"
-                        onClick={() => onDelete(p.id)}
+                        onClick={() => onDelete(b.id)}
                         style={linkBtnDanger}
                       >
                         Desactivar
@@ -175,7 +156,7 @@ export default function ProductsList() {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => onReactivate(p.id)}
+                      onClick={() => onReactivate(b.id)}
                       style={linkBtn}
                     >
                       Reactivar
@@ -186,10 +167,10 @@ export default function ProductsList() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ ...td, textAlign: 'center', padding: 16 }}>
+                <td colSpan={3} style={{ ...td, textAlign: 'center', padding: 16 }}>
                   {showInactive
-                    ? 'No hay productos inactivos.'
-                    : 'No hay productos registrados.'}
+                    ? 'No hay bodegas inactivas.'
+                    : 'No hay bodegas registradas.'}
                 </td>
               </tr>
             )}

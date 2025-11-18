@@ -32,6 +32,9 @@ export default function Layout() {
             <NavLink to="/ingresos">Ingresos</NavLink>
             <NavLink to="/despachos">Despachos</NavLink>
             <NavLink to="/movimientos">Movimientos</NavLink>
+            <NavLink to="/proveedores">Proveedores</NavLink>
+            <NavLink to="/clientes">Clientes</NavLink>
+            <NavLink to="/bodegas">Bodegas</NavLink>
           </nav>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

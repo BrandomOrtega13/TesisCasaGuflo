@@ -1,5 +1,5 @@
 // src/App.tsx
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
@@ -9,6 +9,12 @@ import ProductForm from './pages/ProductForm';
 import Ingresos from './pages/Ingresos';
 import Despachos from './pages/Despachos';
 import Movimientos from './pages/Movimientos';
+import ProveedoresList from './pages/ProveedoresList';
+import ProveedorForm from './pages/ProveedorForm';
+import ClientesList from './pages/ClientesList';
+import ClienteForm from './pages/ClienteForm';
+import BodegasList from './pages/BodegasList';
+import BodegaForm from './pages/BodegaForm';
 
 function NotFound() {
   return <div style={{ padding: 16 }}>Página no encontrada</div>;
@@ -34,12 +40,23 @@ export default function App() {
         {/* Inventario */}
         <Route path="productos" element={<ProductsList />} />
         <Route path="productos/:id" element={<ProductForm />} />
-        <Route path="productos/nuevo" element={<ProductForm />} />
 
         {/* Operaciones */}
         <Route path="ingresos" element={<Ingresos />} />
         <Route path="despachos" element={<Despachos />} />
         <Route path="movimientos" element={<Movimientos />} />
+
+        {/* Proveedores */}
+        <Route path="proveedores" element={<ProveedoresList />} />
+        <Route path="proveedores/:id" element={<ProveedorForm />} />
+
+        {/* Clientes */}
+        <Route path="clientes" element={<ClientesList />} />
+        <Route path="clientes/:id" element={<ClienteForm />} />
+
+        {/* Bodegas */}
+        <Route path="bodegas" element={<BodegasList />} />
+        <Route path="bodegas/:id" element={<BodegaForm />} />
 
         {/* 404 dentro del layout */}
         <Route path="*" element={<NotFound />} />

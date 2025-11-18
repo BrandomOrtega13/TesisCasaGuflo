@@ -2,20 +2,17 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
-type ProductRow = {
+type Proveedor = {
   id: string;
-  sku: string;
   nombre: string;
-  categoria?: string;
-  proveedor?: string;
-  unidad?: string;
-  stock?: number;
-  unidades_por_caja?: number | null;
+  contacto?: string;
+  telefono?: string;
+  correo?: string;
 };
 
-export default function ProductsList() {
-  const [activos, setActivos] = useState<ProductRow[]>([]);
-  const [inactivos, setInactivos] = useState<ProductRow[]>([]);
+export default function ProveedoresList() {
+  const [activos, setActivos] = useState<Proveedor[]>([]);
+  const [inactivos, setInactivos] = useState<Proveedor[]>([]);
   const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -27,14 +24,14 @@ export default function ProductsList() {
     setMsg(null);
     try {
       const [aRes, iRes] = await Promise.all([
-        api.get('/productos'),
-        api.get('/productos/inactivos'),
+        api.get('/proveedores'),
+        api.get('/proveedores/inactivos'),
       ]);
       setActivos(aRes.data);
       setInactivos(iRes.data);
     } catch (err) {
       console.error(err);
-      setMsg('Error al cargar productos');
+      setMsg('Error al cargar proveedores');
     } finally {
       setLoading(false);
     }
@@ -45,23 +42,23 @@ export default function ProductsList() {
   }, []);
 
   const onDelete = async (id: string) => {
-    if (!window.confirm('¿Desactivar este producto?')) return;
+    if (!window.confirm('¿Desactivar este proveedor?')) return;
     try {
-      await api.delete(`/productos/${id}`);
+      await api.delete(`/proveedores/${id}`);
       load();
     } catch (err) {
       console.error(err);
-      setMsg('Error al desactivar producto');
+      setMsg('Error al desactivar proveedor');
     }
   };
 
   const onReactivate = async (id: string) => {
     try {
-      await api.put(`/productos/${id}/reactivar`);
+      await api.put(`/proveedores/${id}/reactivar`);
       load();
     } catch (err) {
       console.error(err);
-      setMsg('Error al reactivar producto');
+      setMsg('Error al reactivar proveedor');
     }
   };
 
@@ -77,7 +74,7 @@ export default function ProductsList() {
           alignItems: 'center',
         }}
       >
-        <h2>Productos</h2>
+        <h2>Proveedores</h2>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <button
             type="button"
@@ -105,10 +102,10 @@ export default function ProductsList() {
           {!showInactive && (
             <button
               type="button"
-              onClick={() => navigate('/productos/nuevo')}
+              onClick={() => navigate('/proveedores/nuevo')}
               style={btnPrimary}
             >
-              + Nuevo producto
+              + Nuevo proveedor
             </button>
           )}
         </div>
@@ -130,36 +127,26 @@ export default function ProductsList() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
             <tr style={{ textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-              <th style={th}>SKU</th>
               <th style={th}>Nombre</th>
-              <th style={th}>Categoría</th>
-              <th style={th}>Proveedor</th>
-              <th style={th}>Unidad</th>
-              {!showInactive && <th style={th}>Stock</th>}
-              <th style={th}>Uds/caja</th>
+              <th style={th}>Contacto</th>
+              <th style={th}>Teléfono</th>
+              <th style={th}>Correo</th>
               <th style={th}>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((p) => (
               <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={td}>{p.sku}</td>
                 <td style={td}>{p.nombre}</td>
-                <td style={td}>{p.categoria || '—'}</td>
-                <td style={td}>{p.proveedor || '—'}</td>
-                <td style={td}>{p.unidad || '—'}</td>
-                {!showInactive && <td style={td}>{p.stock ?? 0}</td>}
-                <td style={td}>
-                  {p.unidades_por_caja && p.unidades_por_caja > 0
-                    ? p.unidades_por_caja
-                    : '—'}
-                </td>
+                <td style={td}>{p.contacto || '—'}</td>
+                <td style={td}>{p.telefono || '—'}</td>
+                <td style={td}>{p.correo || '—'}</td>
                 <td style={td}>
                   {!showInactive ? (
                     <>
                       <button
                         type="button"
-                        onClick={() => navigate(`/productos/${p.id}`)}
+                        onClick={() => navigate(`/proveedores/${p.id}`)}
                         style={linkBtn}
                       >
                         Editar
@@ -186,10 +173,10 @@ export default function ProductsList() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ ...td, textAlign: 'center', padding: 16 }}>
+                <td colSpan={5} style={{ ...td, textAlign: 'center', padding: 16 }}>
                   {showInactive
-                    ? 'No hay productos inactivos.'
-                    : 'No hay productos registrados.'}
+                    ? 'No hay proveedores inactivos.'
+                    : 'No hay proveedores registrados.'}
                 </td>
               </tr>
             )}

@@ -9,18 +9,6 @@ const pool = new Pool({
 
 /**
  * POST /movimientos/ingresos
- * Crea un movimiento tipo INGRESO con sus detalles.
- * Body:
- * {
- *   bodega_id: string,
- *   proveedor_id?: string,
- *   usuario_id?: string,
- *   fecha?: string,
- *   observacion?: string,
- *   detalles: [
- *     { producto_id: string, cantidad: number, costo_unitario?: number }
- *   ]
- * }
  */
 router.post('/ingresos', async (req, res) => {
   const client = await pool.connect();
@@ -72,20 +60,15 @@ router.post('/ingresos', async (req, res) => {
          VALUES ($1, $2, $3, $4)`,
         [movimientoId, d.producto_id, d.cantidad, d.costo_unitario || null]
       );
-      // Trigger aplicar_movimiento_stock suma stock
+      // Trigger suma stock
     }
 
     await client.query('COMMIT');
-
-    res
-      .status(201)
-      .json({ id: movimientoId, message: 'Ingreso registrado' });
+    res.status(201).json({ id: movimientoId, message: 'Ingreso registrado' });
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('Error en POST /movimientos/ingresos:', err.message || err);
-    res
-      .status(500)
-      .json({ message: 'Error al registrar ingreso' });
+    res.status(500).json({ message: 'Error al registrar ingreso' });
   } finally {
     client.release();
   }
@@ -93,21 +76,7 @@ router.post('/ingresos', async (req, res) => {
 
 /**
  * POST /movimientos/despachos
- * Crea un movimiento tipo DESPACHO con sus detalles.
- * Body:
- * {
- *   bodega_id: string,
- *   cliente_id?: string,
- *   usuario_id?: string,
- *   fecha?: string,
- *   observacion?: string,
- *   detalles: [
- *     { producto_id: string, cantidad: number, precio_unitario?: number }
- *   ]
- * }
- * El trigger aplicar_movimiento_stock:
- *  - para DESPACHO resta stock
- *  - lanza error si queda negativo
+ * Maneja precio_tipo y motivo_descuento
  */
 router.post('/despachos', async (req, res) => {
   const client = await pool.connect();
@@ -155,32 +124,30 @@ router.post('/despachos', async (req, res) => {
 
       await client.query(
         `INSERT INTO movimiento_detalles
-           (movimiento_id, producto_id, cantidad, precio_unitario)
-         VALUES ($1, $2, $3, $4)`,
-        [movimientoId, d.producto_id, d.cantidad, d.precio_unitario || null]
+           (movimiento_id, producto_id, cantidad, precio_unitario, precio_tipo, motivo_descuento)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          movimientoId,
+          d.producto_id,
+          d.cantidad,
+          d.precio_unitario || null,
+          d.precio_tipo || null,          // 'NORMAL' | 'MAYORISTA' | 'CAJA' | 'DESCUENTO'
+          d.motivo_descuento || null,
+        ]
       );
-      // Trigger aplicar_movimiento_stock resta stock (factor -1)
+      // Trigger resta stock; si negativo, error y ROLLBACK
     }
 
     await client.query('COMMIT');
-
-    res
-      .status(201)
-      .json({ id: movimientoId, message: 'Despacho registrado' });
+    res.status(201).json({ id: movimientoId, message: 'Despacho registrado' });
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('Error en POST /movimientos/despachos:', err.message || err);
-
     const msg = String(err.message || '');
-
-    // Si viene del trigger por stock negativo, respondemos 400 legible
     if (msg.includes('Stock negativo')) {
       return res.status(400).json({ message: msg });
     }
-
-    res
-      .status(500)
-      .json({ message: 'Error al registrar despacho' });
+    res.status(500).json({ message: 'Error al registrar despacho' });
   } finally {
     client.release();
   }
@@ -188,8 +155,6 @@ router.post('/despachos', async (req, res) => {
 
 /**
  * GET /movimientos
- * Lista movimientos con detalles (uno por fila).
- * Opcional: ?tipo=INGRESO o DESPACHO
  */
 router.get('/', async (req, res) => {
   try {
@@ -219,7 +184,9 @@ router.get('/', async (req, res) => {
          p.nombre  AS producto,
          d.cantidad,
          d.costo_unitario,
-         d.precio_unitario
+         d.precio_unitario,
+         d.precio_tipo,
+         d.motivo_descuento
        FROM movimientos m
        INNER JOIN bodegas b ON b.id = m.bodega_id
        LEFT JOIN proveedores pr ON pr.id = m.proveedor_id
@@ -235,9 +202,7 @@ router.get('/', async (req, res) => {
     res.json(result.rows);
   } catch (err: any) {
     console.error('Error en GET /movimientos:', err.message || err);
-    res
-      .status(500)
-      .json({ message: 'Error al obtener movimientos' });
+    res.status(500).json({ message: 'Error al obtener movimientos' });
   }
 });
 
