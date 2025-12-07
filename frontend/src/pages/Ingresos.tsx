@@ -18,11 +18,16 @@ export default function Ingresos() {
   const [proveedorId, setProveedorId] = useState('');
   const [observacion, setObservacion] = useState('');
   const [detalles, setDetalles] = useState<Detalle[]>([
-    { producto_id: '', cantidad: 1 },
+    { producto_id: '', cantidad: 0 }, // antes 1
   ]);
 
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+
+  // búsqueda
+  const [searchBodega, setSearchBodega] = useState('');
+  const [searchProveedor, setSearchProveedor] = useState('');
+  const [searchProducto, setSearchProducto] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -50,21 +55,33 @@ export default function Ingresos() {
 
   const updateDetalle = (index: number, field: keyof Detalle, value: any) => {
     setDetalles((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, [field]: Number.isNaN(Number(value)) ? value : Number(value) } : d))
+      prev.map((d, i) =>
+        i === index
+          ? {
+              ...d,
+              // si es numérico (cantidad) lo convertimos a número, si no, lo dejamos como string
+              [field]: Number.isNaN(Number(value)) ? value : Number(value),
+            }
+          : d
+      )
     );
   };
 
-  const addDetalle = () => setDetalles((prev) => [...prev, { producto_id: '', cantidad: 1 }]);
-  const removeDetalle = (index: number) => setDetalles((prev) => prev.filter((_, i) => i !== index));
+  const addDetalle = () =>
+    setDetalles((prev) => [...prev, { producto_id: '', cantidad: 0 }]);
+
+  const removeDetalle = (index: number) =>
+    setDetalles((prev) => prev.filter((_, i) => i !== index));
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMsg(null);
     try {
+      // solo mandamos líneas con cantidad > 0
       const limpios = detalles.filter((d) => d.producto_id && d.cantidad > 0);
       if (!bodegaId || limpios.length === 0) {
-        setMsg('Seleccione bodega y al menos un producto');
+        setMsg('Seleccione bodega y al menos un producto con cantidad > 0');
         setLoading(false);
         return;
       }
@@ -72,10 +89,10 @@ export default function Ingresos() {
         bodega_id: bodegaId,
         proveedor_id: proveedorId || null,
         observacion,
-        detalles: limpios, // sin precios en ingresos
+        detalles: limpios,
       });
       setMsg('Ingreso registrado correctamente');
-      setDetalles([{ producto_id: '', cantidad: 1 }]);
+      setDetalles([{ producto_id: '', cantidad: 0 }]); // reset
       setObservacion('');
     } catch (err) {
       console.error(err);
@@ -85,82 +102,187 @@ export default function Ingresos() {
     }
   };
 
+  // ---- LISTAS FILTRADAS (manteniendo el seleccionado) ----
+
+  // bodegas
+  const bodegasFiltradasBase = bodegas.filter((b) =>
+    b.nombre.toLowerCase().includes(searchBodega.toLowerCase())
+  );
+  const selectedBodega = bodegas.find((b) => b.id === bodegaId);
+  const bodegasFiltradas = selectedBodega
+    ? bodegasFiltradasBase.some((b) => b.id === selectedBodega.id)
+      ? bodegasFiltradasBase
+      : [selectedBodega, ...bodegasFiltradasBase]
+    : bodegasFiltradasBase;
+
+  // proveedores
+  const proveedoresFiltradosBase = proveedores.filter((p) =>
+    p.nombre.toLowerCase().includes(searchProveedor.toLowerCase())
+  );
+  const selectedProveedor = proveedores.find((p) => p.id === proveedorId);
+  const proveedoresFiltrados = selectedProveedor
+    ? proveedoresFiltradosBase.some((p) => p.id === selectedProveedor.id)
+      ? proveedoresFiltradosBase
+      : [selectedProveedor, ...proveedoresFiltradosBase]
+    : proveedoresFiltradosBase;
+
+  // productos (filtro global por texto)
+  const productosFiltradosBase = productos.filter((p) => {
+    const texto = `${p.sku} ${p.nombre}`.toLowerCase();
+    return texto.includes(searchProducto.toLowerCase());
+  });
+
   return (
-    <div>
-      <h2>Ingresos</h2>
-      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 12, marginTop: 16, maxWidth: 800 }}>
-        <div>
-          <label>Bodega</label>
-          <select value={bodegaId} onChange={(e) => setBodegaId(e.target.value)} required style={input}>
+    <div className="app-page">
+      <h2 className="page-header-title">Ingresos</h2>
+
+      <form onSubmit={onSubmit} className="mov-form">
+        {/* Bodega */}
+        <div className="form-field">
+          <label className="form-label">Bodega</label>
+          <input
+            placeholder="Buscar bodega..."
+            value={searchBodega}
+            onChange={(e) => setSearchBodega(e.target.value)}
+            className="input"
+          />
+          <select
+            value={bodegaId}
+            onChange={(e) => setBodegaId(e.target.value)}
+            required
+            className="input"
+          >
             <option value="">Seleccione bodega</option>
-            {bodegas.map((b) => (
-              <option key={b.id} value={b.id}>{b.nombre}</option>
+            {bodegasFiltradas.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.nombre}
+              </option>
             ))}
           </select>
         </div>
 
-        <div>
-          <label>Proveedor (opcional)</label>
-          <select value={proveedorId} onChange={(e) => setProveedorId(e.target.value)} style={input}>
+        {/* Proveedor */}
+        <div className="form-field">
+          <label className="form-label">Proveedor (opcional)</label>
+          <input
+            placeholder="Buscar proveedor..."
+            value={searchProveedor}
+            onChange={(e) => setSearchProveedor(e.target.value)}
+            className="input"
+          />
+          <select
+            value={proveedorId}
+            onChange={(e) => setProveedorId(e.target.value)}
+            className="input"
+          >
             <option value="">Sin proveedor</option>
-            {proveedores.map((p) => (
-              <option key={p.id} value={p.id}>{p.nombre}</option>
+            {proveedoresFiltrados.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.nombre}
+              </option>
             ))}
           </select>
         </div>
 
-        <div>
-          <label>Observación</label>
-          <input value={observacion} onChange={(e) => setObservacion(e.target.value)} style={input} />
+        {/* Observación */}
+        <div className="form-field">
+          <label className="form-label">Observación</label>
+          <input
+            value={observacion}
+            onChange={(e) => setObservacion(e.target.value)}
+            className="input"
+          />
         </div>
 
-        <div>
-          <h4>Detalle</h4>
-          {detalles.map((d, i) => (
-            <div key={i} style={row}>
-              <select
-                value={d.producto_id}
-                onChange={(e) => updateDetalle(i, 'producto_id', e.target.value)}
-                required
-                style={input}
-              >
-                <option value="">Seleccione producto</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.sku} - {p.nombre}
-                  </option>
-                ))}
-              </select>
+        {/* Detalle */}
+        <div className="form-field">
+          <label className="form-label">Detalle</label>
 
-              <input
-                type="number"
-                min={1}
-                placeholder="Cantidad (unidades)"
-                value={d.cantidad}
-                onChange={(e) => updateDetalle(i, 'cantidad', e.target.value)}
-                style={input}
-              />
+          <input
+            placeholder="Buscar producto (SKU o nombre)..."
+            value={searchProducto}
+            onChange={(e) => setSearchProducto(e.target.value)}
+            className="input mov-detail-search"
+          />
 
-              {detalles.length > 1 && (
-                <button type="button" onClick={() => removeDetalle(i)} style={btnDel}>✕</button>
-              )}
-            </div>
-          ))}
-          <button type="button" onClick={addDetalle} style={btnAdd}>+ Agregar línea</button>
+          {detalles.map((d, i) => {
+            // asegurar que el producto seleccionado esté en la lista filtrada
+            const opciones = (() => {
+              const base = [...productosFiltradosBase];
+              const seleccionado = productos.find((p) => p.id === d.producto_id);
+              if (seleccionado && !base.some((p) => p.id === seleccionado.id)) {
+                return [seleccionado, ...base];
+              }
+              return base;
+            })();
+
+            return (
+              <div key={i} className="mov-detail-row">
+                <select
+                  value={d.producto_id}
+                  onChange={(e) =>
+                    updateDetalle(i, 'producto_id', e.target.value)
+                  }
+                  required
+                  className="input"
+                >
+                  <option value="">Seleccione producto</option>
+                  {opciones.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.sku} - {p.nombre}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  type="number"
+                  placeholder="Cantidad (unidades)"
+                  value={d.cantidad || ''} // 0 se muestra como vacío
+                  onChange={(e) =>
+                    updateDetalle(i, 'cantidad', e.target.value)
+                  }
+                  className="input"
+                />
+
+                {detalles.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => removeDetalle(i)}
+                    className="btn-icon-danger"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            );
+          })}
+
+          <button
+            type="button"
+            onClick={addDetalle}
+            className="btn-secondary"
+          >
+            + Agregar línea
+          </button>
         </div>
 
-        <button type="submit" disabled={loading} style={btnSubmit}>
+        <button type="submit" disabled={loading} className="btn-primary">
           {loading ? 'Guardando...' : 'Registrar ingreso'}
         </button>
 
-        {msg && <p style={{ fontSize: 12, color: msg.includes('Error') ? '#dc2626' : '#16a34a' }}>{msg}</p>}
+        {msg && (
+          <p
+            className={
+              'form-message ' +
+              (msg.includes('Error')
+                ? 'form-message-error'
+                : 'form-message-success')
+            }
+          >
+            {msg}
+          </p>
+        )}
       </form>
     </div>
   );
 }
-
-const input: React.CSSProperties = { padding: '6px 8px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 };
-const row: React.CSSProperties = { display: 'grid', gridTemplateColumns: '3fr 1fr auto', gap: 8, marginBottom: 6, alignItems: 'center' };
-const btnAdd: React.CSSProperties = { padding: '4px 8px', borderRadius: 6, border: '1px solid #cbd5e1', background: '#f8fafc', fontSize: 12, cursor: 'pointer' };
-const btnDel: React.CSSProperties = { padding: '4px 6px', borderRadius: 6, border: 'none', background: '#fee2e2', cursor: 'pointer' };
-const btnSubmit: React.CSSProperties = { marginTop: 8, padding: '8px 12px', borderRadius: 6, background: '#000', color: '#fff', border: 'none', cursor: 'pointer' };

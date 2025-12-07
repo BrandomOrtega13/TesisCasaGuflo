@@ -2,24 +2,29 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
 
-type ProductRow = {
+type Producto = {
   id: string;
   sku: string;
   nombre: string;
-  categoria?: string;
-  proveedor?: string;
-  unidad?: string;
-  stock?: number;
-  unidades_por_caja?: number | null;
+  categoria?: string | null;
+  categoria_id?: string | null;
+  proveedor?: string | null;
+  stock_total?: number | string | null;
+  stock?: number | string | null;
+  cantidad?: number | string | null;
+  unidades_por_caja?: number | string | null;
+  uds_caja?: number | string | null;
+  activo?: boolean;
 };
 
 export default function ProductsList() {
-  const [activos, setActivos] = useState<ProductRow[]>([]);
-  const [inactivos, setInactivos] = useState<ProductRow[]>([]);
+  const [activos, setActivos] = useState<Producto[]>([]);
+  const [inactivos, setInactivos] = useState<Producto[]>([]);
   const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
+  const [search, setSearch] = useState('');
   const navigate = useNavigate();
 
   const load = async () => {
@@ -30,11 +35,13 @@ export default function ProductsList() {
         api.get('/productos'),
         api.get('/productos/inactivos'),
       ]);
+
       setActivos(aRes.data);
       setInactivos(iRes.data);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setMsg('Error al cargar productos');
+      const m = err.response?.data?.message || 'Error al cargar productos';
+      setMsg(m);
     } finally {
       setLoading(false);
     }
@@ -44,7 +51,7 @@ export default function ProductsList() {
     load();
   }, []);
 
-  const onDelete = async (id: string) => {
+  const onDeactivate = async (id: string) => {
     if (!window.confirm('¿Desactivar este producto?')) return;
     try {
       await api.delete(`/productos/${id}`);
@@ -65,48 +72,111 @@ export default function ProductsList() {
     }
   };
 
-  const rows = showInactive ? inactivos : activos;
+  const onHardDelete = async (id: string) => {
+    if (
+      !window.confirm(
+        '⚠ Esta acción eliminará el producto definitivamente, incluso si tiene movimientos.\n\n¿Continuar?'
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.delete(`/productos/${id}/hard`);
+      load();
+    } catch (err: any) {
+      console.error(err);
+      const m =
+        err.response?.data?.message ||
+        'No se pudo eliminar el producto (revisa el backend).';
+      setMsg(m);
+    }
+  };
+
+  const rowsBase = showInactive ? inactivos : activos;
+
+  const rows = rowsBase.filter((p) => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return (
+      p.sku?.toLowerCase().includes(q) ||
+      p.nombre?.toLowerCase().includes(q) ||
+      (p.categoria ?? '').toLowerCase().includes(q)
+    );
+  });
+
+  const getStock = (p: Producto): number => {
+    const raw =
+      p.stock_total ??
+      p.stock ??
+      p.cantidad ??
+      (p as any).existencia ??
+      (p as any).stock_global ??
+      0;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return 0;
+    return n;
+  };
+
+  const getUdsCaja = (p: Producto): number | null => {
+    const raw =
+      p.unidades_por_caja ??
+      p.uds_caja ??
+      (p as any).unidades_caja ??
+      (p as any).u_x_caja ??
+      null;
+    if (raw === null || raw === undefined) return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return null;
+    return n;
+  };
+
+  const isStockBajo = (stock: number) => {
+    // REGLA: alerta cuando stock <= 24 unidades
+    return stock > 0 && stock <= 24;
+  };
 
   return (
     <div>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          marginBottom: 12,
-          alignItems: 'center',
-        }}
-      >
-        <h2>Productos</h2>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={() => setShowInactive(false)}
-            style={{
-              ...pill,
-              background: !showInactive ? '#000' : '#e5e7eb',
-              color: !showInactive ? '#fff' : '#111827',
-            }}
-          >
-            Activos
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowInactive(true)}
-            style={{
-              ...pill,
-              background: showInactive ? '#000' : '#e5e7eb',
-              color: showInactive ? '#fff' : '#111827',
-            }}
-          >
-            Inactivos
-          </button>
+      {/* Cabecera de página */}
+      <div className="page-header">
+        <h2 className="page-header-title">Productos</h2>
+
+        <div className="page-header-actions">
+          <input
+            placeholder="Buscar por SKU, nombre o categoría..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="search-input"
+          />
+
+          <div className="segmented">
+            <button
+              type="button"
+              onClick={() => setShowInactive(false)}
+              className={
+                'segmented-button ' +
+                (!showInactive ? 'segmented-button--active' : '')
+              }
+            >
+              Activos
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowInactive(true)}
+              className={
+                'segmented-button ' +
+                (showInactive ? 'segmented-button--active' : '')
+              }
+            >
+              Inactivos
+            </button>
+          </div>
 
           {!showInactive && (
             <button
               type="button"
               onClick={() => navigate('/productos/nuevo')}
-              style={btnPrimary}
+              className="btn-primary"
             >
               + Nuevo producto
             </button>
@@ -114,79 +184,105 @@ export default function ProductsList() {
         </div>
       </div>
 
-      {loading && <p>Cargando...</p>}
+      {loading && <p className="list-message">Cargando...</p>}
       {msg && (
         <p
-          style={{
-            fontSize: 12,
-            color: msg.includes('Error') ? '#dc2626' : '#16a34a',
-          }}
+          className={
+            'list-message ' +
+            (msg.includes('Error')
+              ? 'list-message-error'
+              : 'list-message-success')
+          }
         >
           {msg}
         </p>
       )}
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+      <div className="table-container">
+        <table className="table">
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-              <th style={th}>SKU</th>
-              <th style={th}>Nombre</th>
-              <th style={th}>Categoría</th>
-              <th style={th}>Proveedor</th>
-              <th style={th}>Unidad</th>
-              {!showInactive && <th style={th}>Stock</th>}
-              <th style={th}>Uds/caja</th>
-              <th style={th}>Acciones</th>
+            <tr>
+              <th className="table-header-cell">SKU</th>
+              <th className="table-header-cell">Nombre</th>
+              <th className="table-header-cell">Categoría</th>
+              <th className="table-header-cell">Stock</th>
+              <th className="table-header-cell">UDS/CAJA</th>
+              <th className="table-header-cell">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((p) => (
-              <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={td}>{p.sku}</td>
-                <td style={td}>{p.nombre}</td>
-                <td style={td}>{p.categoria || '—'}</td>
-                <td style={td}>{p.proveedor || '—'}</td>
-                <td style={td}>{p.unidad || '—'}</td>
-                {!showInactive && <td style={td}>{p.stock ?? 0}</td>}
-                <td style={td}>
-                  {p.unidades_por_caja && p.unidades_por_caja > 0
-                    ? p.unidades_por_caja
-                    : '—'}
-                </td>
-                <td style={td}>
-                  {!showInactive ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/productos/${p.id}`)}
-                        style={linkBtn}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(p.id)}
-                        style={linkBtnDanger}
-                      >
-                        Desactivar
-                      </button>
-                    </>
-                  ) : (
+            {rows.map((p) => {
+              const stock = getStock(p);
+              const udsCaja = getUdsCaja(p);
+              const stockBajo = isStockBajo(stock);
+
+              const rowClass =
+                'table-row' + (stockBajo ? ' stock-low-row' : '');
+
+              return (
+                <tr key={p.id} className={rowClass}>
+                  <td className="table-cell">{p.sku}</td>
+                  <td className="table-cell">{p.nombre}</td>
+                  <td className="table-cell">{p.categoria || '—'}</td>
+                  <td className="table-cell">
+                    {stock}
+                    {stockBajo && (
+                      <span className="stock-low-badge">Stock bajo</span>
+                    )}
+                  </td>
+                  <td className="table-cell">{udsCaja ?? '—'}</td>
+                  <td className="table-cell">
                     <button
                       type="button"
-                      onClick={() => onReactivate(p.id)}
-                      style={linkBtn}
+                      onClick={() => navigate(`/productos/${p.id}/detalle`)}
+                      className="link-btn"
                     >
-                      Reactivar
+                      Ver detalles
                     </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                    {!showInactive && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/productos/${p.id}`)}
+                          className="link-btn"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeactivate(p.id)}
+                          className="link-btn link-btn-danger"
+                        >
+                          Desactivar
+                        </button>
+                      </>
+                    )}
+                    {showInactive && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onReactivate(p.id)}
+                          className="link-btn"
+                        >
+                          Reactivar
+                        </button>
+                          <button
+                          type="button"
+                          onClick={() => onHardDelete(p.id)}
+                          className="link-btn link-btn-danger"
+                        >
+                          Eliminar
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} style={{ ...td, textAlign: 'center', padding: 16 }}>
+                <td colSpan={6} className="table-cell table-cell-empty">
                   {showInactive
                     ? 'No hay productos inactivos.'
                     : 'No hay productos registrados.'}
@@ -199,47 +295,3 @@ export default function ProductsList() {
     </div>
   );
 }
-
-const th: React.CSSProperties = {
-  padding: '8px 6px',
-  fontWeight: 600,
-  fontSize: 12,
-  textTransform: 'uppercase',
-  color: '#64748b',
-};
-
-const td: React.CSSProperties = {
-  padding: '6px 6px',
-};
-
-const pill: React.CSSProperties = {
-  borderRadius: 999,
-  padding: '4px 10px',
-  border: 'none',
-  cursor: 'pointer',
-  fontSize: 12,
-};
-
-const btnPrimary: React.CSSProperties = {
-  padding: '6px 10px',
-  borderRadius: 6,
-  border: 'none',
-  background: '#000',
-  color: '#fff',
-  cursor: 'pointer',
-  fontSize: 13,
-};
-
-const linkBtn: React.CSSProperties = {
-  border: 'none',
-  background: 'none',
-  color: '#0f766e',
-  cursor: 'pointer',
-  fontSize: 12,
-  marginRight: 6,
-};
-
-const linkBtnDanger: React.CSSProperties = {
-  ...linkBtn,
-  color: '#b91c1c',
-};

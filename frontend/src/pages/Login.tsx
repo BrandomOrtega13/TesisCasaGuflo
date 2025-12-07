@@ -26,64 +26,41 @@ export default function Login() {
   };
 
   return (
-    <div
-      style={{
-        maxWidth: 420,
-        margin: '40px auto',
-        background: '#fff',
-        padding: 24,
-        borderRadius: 8,
-        border: '1px solid #e5e7eb',
-      }}
-    >
-      <h1 style={{ fontSize: 20, fontWeight: 600, marginBottom: 12 }}>Iniciar sesión</h1>
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        style={{ display: 'grid', gap: 12 }}
-      >
-        <div>
-          <label style={{ fontSize: 12 }}>Email</label>
+    <div className="form-card" style={{ marginTop: 40 }}>
+      <h1 className="form-title">Iniciar sesión</h1>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="form-grid">
+        <div className="form-field">
+          <label className="form-label">Email</label>
           <input
             {...register('email')}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-            }}
+            className="form-input"
           />
           {formState.errors.email && (
-            <p style={{ color: '#dc2626', fontSize: 12 }}>
+            <p className="form-message form-message-error">
               {String(formState.errors.email.message)}
             </p>
           )}
         </div>
-        <div>
-          <label style={{ fontSize: 12 }}>Contraseña</label>
+
+        <div className="form-field">
+          <label className="form-label">Contraseña</label>
           <input
             type="password"
             {...register('password')}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              borderRadius: 6,
-              border: '1px solid #cbd5e1',
-            }}
+            className="form-input"
           />
           {formState.errors.password && (
-            <p style={{ color: '#dc2626', fontSize: 12 }}>
+            <p className="form-message form-message-error">
               {String(formState.errors.password.message)}
             </p>
           )}
         </div>
+
         <button
+          type="submit"
           disabled={formState.isSubmitting}
-          style={{
-            background: '#000',
-            color: '#fff',
-            padding: '8px 12px',
-            borderRadius: 6,
-          }}
+          className="btn-primary"
         >
           Entrar
         </button>

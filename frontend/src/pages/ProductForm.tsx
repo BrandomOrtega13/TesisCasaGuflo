@@ -1,7 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../lib/api';
+
+type Categoria = {
+  id: string;
+  nombre: string;
+};
 
 type FormData = {
   sku: string;
@@ -11,7 +16,7 @@ type FormData = {
   precio_mayorista?: number;
   precio_caja?: number;
   unidades_por_caja?: number;
-  // luego si quieres: categoria_id, proveedor_id, unidad_id
+  categoria_id?: string;
 };
 
 export default function ProductForm() {
@@ -19,109 +24,197 @@ export default function ProductForm() {
   const isNew = !id || id === 'nuevo';
   const navigate = useNavigate();
 
-  const { register, handleSubmit, reset } = useForm<FormData>();
+  const { register, handleSubmit, reset, setValue } = useForm<FormData>();
 
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  // Cargar categorías para desplegable
+  useEffect(() => {
+    const loadCategorias = async () => {
+      try {
+        const res = await api.get('/categorias');
+        setCategorias(res.data);
+      } catch (err) {
+        console.error('Error cargando categorías', err);
+        setMsg('Error al cargar categorías');
+      }
+    };
+    loadCategorias();
+  }, []);
+
+  // Si es edición, cargar producto
   useEffect(() => {
     const load = async () => {
       if (!isNew && id) {
-        const res = await api.get(`/productos/${id}`);
-        reset({
-          sku: res.data.sku,
-          nombre: res.data.nombre,
-          precio_compra: res.data.precio_compra || 0,
-          precio_venta: res.data.precio_venta || 0,
-          precio_mayorista: res.data.precio_mayorista || 0,
-          precio_caja: res.data.precio_caja || 0,
-          unidades_por_caja: res.data.unidades_por_caja || undefined,
-        });
+        try {
+          const res = await api.get(`/productos/${id}`);
+          reset({
+            sku: res.data.sku,
+            nombre: res.data.nombre,
+            precio_compra: res.data.precio_compra || 0,
+            precio_venta: res.data.precio_venta || 0,
+            precio_mayorista: res.data.precio_mayorista || 0,
+            precio_caja: res.data.precio_caja || 0,
+            unidades_por_caja: res.data.unidades_por_caja || undefined,
+            categoria_id: res.data.categoria_id || '',
+          });
+          if (res.data.categoria_id) {
+            setValue('categoria_id', res.data.categoria_id);
+          }
+        } catch {
+          setMsg('Error al cargar producto');
+        }
       }
     };
     load();
-  }, [id, isNew, reset]);
+  }, [id, isNew, reset, setValue]);
 
   const onSubmit = async (data: FormData) => {
-    if (isNew) {
-      await api.post('/productos', data);
-    } else if (id) {
-      await api.put(`/productos/${id}`, data);
+    try {
+      const payload = {
+        sku: data.sku,
+        nombre: data.nombre,
+        precio_compra: data.precio_compra || 0,
+        precio_venta: data.precio_venta || 0,
+        precio_mayorista: data.precio_mayorista || 0,
+        precio_caja: data.precio_caja || 0,
+        unidades_por_caja: data.unidades_por_caja || null,
+        categoria_id: data.categoria_id || null,
+      };
+
+      if (isNew) {
+        await api.post('/productos', payload);
+        setMsg('Producto creado correctamente');
+      } else if (id) {
+        await api.put(`/productos/${id}`, payload);
+        setMsg('Producto actualizado correctamente');
+      }
+
+      navigate('/productos');
+    } catch (err: any) {
+      console.error(err);
+      setMsg(err.response?.data?.message || 'Error al guardar producto');
     }
-    navigate('/productos');
   };
 
   return (
-    <div
-      style={{
-        maxWidth: 520,
-        margin: '20px auto',
-        padding: 20,
-        background: '#fff',
-        borderRadius: 8,
-        border: '1px solid #e5e7eb',
-      }}
-    >
-      <h2>{isNew ? 'Nuevo producto' : 'Editar producto'}</h2>
-      <form
-        onSubmit={handleSubmit(onSubmit)}
-        style={{ display: 'grid', gap: 12, marginTop: 16 }}
-      >
-        <div>
-          <label>SKU</label>
-          <input {...register('sku', { required: true })} style={input} />
-        </div>
-        <div>
-          <label>Nombre</label>
-          <input {...register('nombre', { required: true })} style={input} />
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label>Precio compra</label>
-            <input type="number" step="0.01" {...register('precio_compra')} style={input} />
-          </div>
-          <div>
-            <label>Precio venta</label>
-            <input type="number" step="0.01" {...register('precio_venta')} style={input} />
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label>Precio mayorista</label>
-            <input type="number" step="0.01" {...register('precio_mayorista')} style={input} />
-          </div>
-          <div>
-            <label>Precio por caja</label>
-            <input type="number" step="0.01" {...register('precio_caja')} style={input} />
-          </div>
-        </div>
-
-        <div>
-          <label>Unidades por caja</label>
-          <input type="number" min={1} {...register('unidades_por_caja')} style={input} />
-        </div>
-
-        <button type="submit" style={btn}>
-          Guardar
+    <div className="form-page">
+      <div className="card">
+        <button
+          type="button"
+          className="btn-link-back"
+          onClick={() => navigate('/productos')}
+        >
+          ← Volver
         </button>
-      </form>
+
+        <h2 className="form-title">
+          {isNew ? 'Nuevo producto' : 'Editar producto'}
+        </h2>
+
+        {msg && (
+          <p
+            className={`form-message ${
+              msg.includes('Error') ? 'form-message-error' : 'form-message-success'
+            }`}
+          >
+            {msg}
+          </p>
+        )}
+
+        <form onSubmit={handleSubmit(onSubmit)} className="form-grid">
+          <div className="form-field">
+            <label className="form-label">SKU *</label>
+            <input
+              className="form-input"
+              {...register('sku', { required: true })}
+            />
+          </div>
+
+          <div className="form-field">
+            <label className="form-label">Nombre *</label>
+            <input
+              className="form-input"
+              {...register('nombre', { required: true })}
+            />
+          </div>
+
+          <div className="form-field">
+            <label className="form-label">Categoría (opcional)</label>
+            <select
+              className="form-input"
+              {...register('categoria_id')}
+              onChange={(e) => setValue('categoria_id', e.target.value)}
+            >
+              <option value="">Sin categoría</option>
+              {categorias.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div className="form-field">
+              <label className="form-label">Precio compra</label>
+              <input
+                type="number"
+                step="0.01"
+                className="form-input"
+                {...register('precio_compra')}
+              />
+            </div>
+
+            <div className="form-field">
+              <label className="form-label">Precio unitario</label>
+              <input
+                type="number"
+                step="0.01"
+                className="form-input"
+                {...register('precio_venta')}
+              />
+            </div>
+          </div>
+
+          <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div className="form-field">
+              <label className="form-label">Precio mayorista</label>
+              <input
+                type="number"
+                step="0.01"
+                className="form-input"
+                {...register('precio_mayorista')}
+              />
+            </div>
+
+            <div className="form-field">
+              <label className="form-label">Precio por caja</label>
+              <input
+                type="number"
+                step="0.01"
+                className="form-input"
+                {...register('precio_caja')}
+              />
+            </div>
+          </div>
+
+          <div className="form-field">
+            <label className="form-label">Unidades por caja</label>
+            <input
+              type="number"
+              min={1}
+              className="form-input"
+              {...register('unidades_por_caja')}
+            />
+          </div>
+
+          <button type="submit" className="btn-primary">
+            Guardar
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
-
-const input: React.CSSProperties = {
-  width: '100%',
-  padding: '6px 10px',
-  borderRadius: 6,
-  border: '1px solid #cbd5e1',
-  fontSize: 14,
-};
-
-const btn: React.CSSProperties = {
-  marginTop: 8,
-  padding: '8px 12px',
-  background: '#000',
-  color: '#fff',
-  borderRadius: 6,
-  border: 'none',
-  cursor: 'pointer',
-};

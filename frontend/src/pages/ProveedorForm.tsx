@@ -79,90 +79,79 @@ export default function ProveedorForm() {
   };
 
   return (
-    <div
-      style={{
-        maxWidth: 500,
-        background: '#fff',
-        borderRadius: 8,
-        border: '1px solid #e5e7eb',
-        padding: 16,
-      }}
-    >
-      <h2 style={{ marginBottom: 12 }}>
-        {isNew ? 'Nuevo proveedor' : 'Editar proveedor'}
-      </h2>
-
-      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 10 }}>
-        <div>
-          <label>Nombre *</label>
-          <input
-            name="nombre"
-            value={form.nombre}
-            onChange={onChange}
-            style={input}
-          />
-        </div>
-        <div>
-          <label>Contacto</label>
-          <input
-            name="contacto"
-            value={form.contacto}
-            onChange={onChange}
-            style={input}
-          />
-        </div>
-        <div>
-          <label>Teléfono</label>
-          <input
-            name="telefono"
-            value={form.telefono}
-            onChange={onChange}
-            style={input}
-          />
-        </div>
-        <div>
-          <label>Correo</label>
-          <input
-            name="correo"
-            value={form.correo}
-            onChange={onChange}
-            style={input}
-          />
-        </div>
-
-        <button type="submit" disabled={loading} style={btnSubmit}>
-          {loading ? 'Guardando...' : 'Guardar'}
+    <div className="form-page">
+      <div className="card">
+        <button
+          type="button"
+          onClick={() => navigate('/proveedores')}
+          className="btn-link-back"
+        >
+          ← Volver
         </button>
 
-        {msg && (
-          <p
-            style={{
-              fontSize: 12,
-              color: msg.includes('Error') ? '#dc2626' : '#16a34a',
-            }}
-          >
-            {msg}
-          </p>
-        )}
-      </form>
+        <h2 className="form-title">
+          {isNew ? 'Nuevo proveedor' : 'Editar proveedor'}
+        </h2>
+
+        <form onSubmit={onSubmit} className="form-grid">
+          <div className="form-field">
+            <label className="form-label">Nombre *</label>
+            <input
+              name="nombre"
+              value={form.nombre}
+              onChange={onChange}
+              className="form-input"
+            />
+          </div>
+
+          <div className="form-field">
+            <label className="form-label">Contacto</label>
+            <input
+              name="contacto"
+              value={form.contacto}
+              onChange={onChange}
+              className="form-input"
+            />
+          </div>
+
+          <div className="form-field">
+            <label className="form-label">Teléfono</label>
+            <input
+              name="telefono"
+              value={form.telefono}
+              onChange={onChange}
+              className="form-input"
+            />
+          </div>
+
+          <div className="form-field">
+            <label className="form-label">Correo</label>
+            <input
+              name="correo"
+              value={form.correo}
+              onChange={onChange}
+              className="form-input"
+            />
+          </div>
+
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading ? 'Guardando...' : 'Guardar'}
+          </button>
+
+          {msg && (
+            <p
+              className={
+                'form-message ' +
+                (msg.includes('Error')
+                  ? 'form-message-error'
+                  : 'form-message-success')
+              }
+            >
+              {msg}
+            </p>
+          )}
+        </form>
+      </div>
     </div>
   );
 }
-
-const input: React.CSSProperties = {
-  width: '100%',
-  padding: '6px 8px',
-  borderRadius: 6,
-  border: '1px solid #cbd5e1',
-  fontSize: 13,
-};
-
-const btnSubmit: React.CSSProperties = {
-  marginTop: 8,
-  padding: '8px 12px',
-  borderRadius: 6,
-  background: '#000',
-  color: '#fff',
-  border: 'none',
-  cursor: 'pointer',
-};

@@ -175,4 +175,44 @@ router.put('/:id/reactivar', async (req, res) => {
   }
 });
 
+router.delete('/:id/hard', async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Quitar referencia en movimientos
+    await client.query(
+      `UPDATE movimientos
+       SET proveedor_id = NULL
+       WHERE proveedor_id = $1`,
+      [id]
+    );
+
+    // Eliminar proveedor
+    const delRes = await client.query(
+      `DELETE FROM proveedores
+       WHERE id = $1`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    if (delRes.rowCount === 0) {
+      return res.status(404).json({ message: 'Proveedor no encontrado' });
+    }
+
+    return res.status(204).send();
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Error en DELETE /proveedores/:id/hard', err.message || err);
+    return res
+      .status(500)
+      .json({ message: 'Error al eliminar proveedor', detail: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 export default router;

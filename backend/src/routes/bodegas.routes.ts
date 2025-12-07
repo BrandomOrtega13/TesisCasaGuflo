@@ -171,4 +171,60 @@ router.put('/:id/reactivar', async (req, res) => {
   }
 });
 
+router.delete('/:id/hard', async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Borrar detalles de movimientos de esa bodega
+    await client.query(
+      `DELETE FROM movimiento_detalles
+       WHERE movimiento_id IN (
+         SELECT id FROM movimientos WHERE bodega_id = $1
+       )`,
+      [id]
+    );
+
+    // Borrar movimientos de esa bodega
+    await client.query(
+      `DELETE FROM movimientos
+       WHERE bodega_id = $1`,
+      [id]
+    );
+
+    // Borrar stock de esa bodega
+    await client.query(
+      `DELETE FROM stock
+       WHERE bodega_id = $1`,
+      [id]
+    );
+
+    // Finalmente, borrar la bodega
+    const delRes = await client.query(
+      `DELETE FROM bodegas
+       WHERE id = $1`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    if (delRes.rowCount === 0) {
+      return res.status(404).json({ message: 'Bodega no encontrada' });
+    }
+
+    return res.status(204).send();
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Error en DELETE /bodegas/:id/hard', err.message || err);
+    return res
+      .status(500)
+      .json({ message: 'Error al eliminar bodega', detail: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+
 export default router;

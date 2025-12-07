@@ -14,34 +14,50 @@ const pool = new Pool({
 router.get('/', async (_req, res) => {
   try {
     const result = await pool.query(
-      `SELECT
-         p.id,
-         p.sku,
-         p.nombre,
-         c.nombre       AS categoria,
-         pr.nombre      AS proveedor,
-         u.codigo       AS unidad,
-         p.precio_venta,
-         p.precio_mayorista,
-         p.precio_caja,
-         p.unidades_por_caja,
-         COALESCE(SUM(s.cantidad), 0) AS stock
-       FROM productos p
-       LEFT JOIN categorias c ON c.id = p.categoria_id
-       LEFT JOIN proveedores pr ON pr.id = p.proveedor_id
-       LEFT JOIN unidades u ON u.id = p.unidad_id
-       LEFT JOIN stock s ON s.producto_id = p.id
-       WHERE p.activo = TRUE
-       GROUP BY
-         p.id,
-         c.nombre,
-         pr.nombre,
-         u.codigo,
-         p.precio_venta,
-         p.precio_mayorista,
-         p.precio_caja,
-         p.unidades_por_caja
-       ORDER BY p.nombre`
+      `
+      SELECT
+        p.id,
+        p.sku,
+        p.nombre,
+        c.nombre AS categoria,
+        COALESCE(pr.nombre, ult_prov.nombre) AS proveedor,
+        u.codigo       AS unidad,
+        p.precio_venta,
+        p.precio_mayorista,
+        p.precio_caja,
+        p.unidades_por_caja,
+        COALESCE(SUM(s.cantidad), 0) AS stock
+      FROM productos p
+      LEFT JOIN categorias c ON c.id = p.categoria_id
+      LEFT JOIN proveedores pr ON pr.id = p.proveedor_id
+      LEFT JOIN unidades u ON u.id = p.unidad_id
+      LEFT JOIN stock s ON s.producto_id = p.id
+
+      -- último proveedor que hizo un INGRESO de este producto
+      LEFT JOIN LATERAL (
+        SELECT pv.nombre
+        FROM movimientos m
+        JOIN movimiento_detalles md ON md.movimiento_id = m.id
+        JOIN proveedores pv ON pv.id = m.proveedor_id
+        WHERE md.producto_id = p.id
+          AND m.tipo = 'INGRESO'
+        ORDER BY m.fecha DESC
+        LIMIT 1
+      ) AS ult_prov ON TRUE
+
+      WHERE p.activo = TRUE
+      GROUP BY
+        p.id,
+        c.nombre,
+        pr.nombre,
+        ult_prov.nombre,
+        u.codigo,
+        p.precio_venta,
+        p.precio_mayorista,
+        p.precio_caja,
+        p.unidades_por_caja
+      ORDER BY p.nombre;
+      `
     );
 
     res.json(result.rows);
@@ -107,36 +123,80 @@ router.put('/:id/reactivar', async (req, res) => {
  * GET /productos/:id
  */
 router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
+  const { id } = req.params;
 
-    const result = await pool.query(
-      `SELECT
-         id,
-         sku,
-         nombre,
-         categoria_id,
-         proveedor_id,
-         unidad_id,
-         precio_compra,
-         precio_venta,
-         precio_mayorista,
-         precio_caja,
-         unidades_por_caja,
-         activo
-       FROM productos
-       WHERE id = $1`,
+  try {
+    const base = await pool.query(
+      `
+      SELECT
+        p.id,
+        p.sku,
+        p.nombre,
+        c.nombre AS categoria,
+        COALESCE(pr.nombre, ult_prov.nombre) AS proveedor,
+        p.precio_compra,
+        p.precio_venta,
+        p.precio_mayorista,
+        p.precio_caja,
+        p.unidades_por_caja,
+        COALESCE(SUM(s.cantidad), 0) AS stock_total,
+        p.activo
+      FROM productos p
+      LEFT JOIN categorias  c  ON c.id  = p.categoria_id
+      LEFT JOIN proveedores pr ON pr.id = p.proveedor_id
+      LEFT JOIN stock       s  ON s.producto_id = p.id
+
+      -- último proveedor que hizo un INGRESO de este producto
+      LEFT JOIN LATERAL (
+        SELECT pv.nombre
+        FROM movimientos m
+        JOIN movimiento_detalles md ON md.movimiento_id = m.id
+        JOIN proveedores pv ON pv.id = m.proveedor_id
+        WHERE md.producto_id = p.id
+          AND m.tipo = 'INGRESO'
+        ORDER BY m.fecha DESC
+        LIMIT 1
+      ) AS ult_prov ON TRUE
+
+      WHERE p.id = $1
+      GROUP BY
+        p.id,
+        c.nombre,
+        pr.nombre,
+        ult_prov.nombre
+      `,
       [id]
     );
 
-    if (result.rowCount === 0) {
+    if (base.rowCount === 0) {
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
-    res.json(result.rows[0]);
+    const producto = base.rows[0];
+
+    // Obtener stock por bodega
+    const bodegasRes = await pool.query(
+      `
+      SELECT 
+        b.id,
+        b.nombre AS bodega,
+        COALESCE(s.cantidad, 0) AS cantidad
+      FROM bodegas b
+      LEFT JOIN stock s ON s.bodega_id = b.id AND s.producto_id = $1
+      ORDER BY b.nombre;
+      `,
+      [id]
+    );
+
+    producto.bodegas = bodegasRes.rows;
+
+    return res.json(producto);
   } catch (err: any) {
-    console.error('Error en GET /productos/:id:', err.message || err);
-    res.status(500).json({ message: 'Error al obtener producto' });
+    console.error('Error en GET /productos/:id', err.message || err);
+    return res.status(500).json({
+      message: 'Error al obtener producto',
+      detail: err.message,
+    });
   }
 });
 
@@ -317,3 +377,40 @@ router.delete('/:id', async (req, res) => {
 });
 
 export default router;
+
+/**
+ * DELETE /productos/:id/hard
+ */
+router.delete('/:id/hard', async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    await client.query(
+      'DELETE FROM movimiento_detalles WHERE producto_id = $1',
+      [id]
+    );
+
+    await client.query('DELETE FROM stock WHERE producto_id = $1', [id]);
+
+    const delRes = await client.query('DELETE FROM productos WHERE id = $1', [id]);
+
+    await client.query('COMMIT');
+
+    if (delRes.rowCount === 0) {
+      return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+
+    return res.status(204).send();
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Error en DELETE /productos/:id/hard', err.message || err);
+    return res
+      .status(500)
+      .json({ message: 'Error al eliminar producto', detail: err.message });
+  } finally {
+    client.release();
+  }
+});

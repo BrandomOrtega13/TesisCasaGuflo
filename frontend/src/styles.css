@@ -1,0 +1,551 @@
+.app-page {
+  /* contenedor general de cada pantalla, por si quieres algo global */
+}
+
+/* ===== LAYOUT GENERAL ===== */
+
+.layout-container {
+  min-height: 100vh;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+/* ===== HEADER ===== */
+
+.layout-header {
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
+
+.layout-header-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.layout-logo {
+  font-weight: 700;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ===== NAVEGACIÓN ===== */
+
+.layout-nav {
+  display: flex;
+  gap: 16px;
+}
+
+.layout-nav a {
+  text-decoration: none;
+  color: #0f172a;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.layout-nav a.active {
+  border-bottom: 2px solid #0f766e;
+  padding-bottom: 2px;
+  color: #0f766e;
+}
+
+/* ===== USER AREA ===== */
+
+.layout-user-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.layout-user-info {
+  font-size: 12px;
+}
+
+.layout-logout-btn {
+  font-size: 12px;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #0f172a;
+}
+
+.layout-logout-btn:hover {
+  color: #dc2626;
+}
+
+/* ===== MAIN CONTENT ===== */
+
+.layout-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* ===== CABECERA DE PÁGINA ===== */
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.page-header-title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.page-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ===== TARJETAS / FORMULARIOS GENERALES ===== */
+
+.form-card {
+  max-width: 520px;
+  margin: 20px auto;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 16px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 16px;
+}
+
+/* Páginas de formulario centradas */
+
+.form-page {
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+/* Botón "Volver" arriba del formulario */
+
+.btn-link-back {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-bottom: 12px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #16a34a;
+}
+
+.btn-link-back:hover {
+  text-decoration: underline;
+}
+
+/* Título del formulario */
+
+.form-title {
+  margin-bottom: 12px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Grid del formulario */
+
+.form-grid {
+  display: grid;
+  gap: 10px;
+}
+
+/* Campo individual */
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Label */
+
+.form-label {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+/* ===== INPUTS / SELECTS / TEXTAREAS ===== */
+
+.input,
+.select,
+.textarea {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.input--small {
+  font-size: 12px;
+}
+
+/* Input de búsqueda en listas */
+
+.search-input {
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  font-size: 13px;
+}
+
+/* ===== BOTONES ===== */
+
+.btn {
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* Botón principal (forms, acciones importantes) */
+
+.btn-primary {
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #000;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* Variante compacta tipo listado (usada en listas) */
+.btn-primary--small {
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+/* Botón secundario (borde gris, fondo blanco) */
+
+.btn-secondary {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* Botones tipo link (en tablas) */
+
+.btn-link,
+.link-btn {
+  border: none;
+  background: none;
+  color: #0f766e;
+  cursor: pointer;
+  font-size: 12px;
+  margin-right: 6px;
+}
+
+.btn-link-danger,
+.link-btn-danger {
+  color: #b91c1c;
+}
+
+/* Chip pequeño (por ejemplo tipo precio) */
+
+.btn-chip {
+  font-size: 11px;
+  background: #e2e8f0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  border: 1px solid #cbd5e1;
+}
+
+/* Botón pill para Activos / Inactivos */
+
+.pill-toggle {
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  background: #e5e7eb;
+  color: #111827;
+}
+
+.pill-toggle--active {
+  background: #000;
+  color: #fff;
+}
+
+/* Segmentado estilo "Activos / Inactivos" */
+
+.segmented {
+  display: inline-flex;
+  border-radius: 999px;
+  background: #e5e7eb;
+  padding: 2px;
+}
+
+.segmented-button {
+  border-radius: 999px;
+  padding: 4px 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  background: transparent;
+  color: #111827;
+}
+
+.segmented-button--active {
+  background: #000;
+  color: #fff;
+}
+
+/* Botón ícono de eliminar (✕) en filas de detalle */
+
+.btn-icon-danger {
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: none;
+  background: #fee2e2;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ===== TABLAS ===== */
+
+.table-wrapper,
+.table-container {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table thead tr {
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.table-header-cell,
+.table th {
+  padding: 8px 6px;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.table-row,
+.table tr {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.table-cell,
+.table td {
+  padding: 6px 6px;
+}
+
+.table-cell-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 14px;
+}
+
+/* ===== DATA TABLE GENÉRICO (DataTable.tsx) ===== */
+
+.data-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.data-table {
+  width: 100%;
+  font-size: 14px;
+  border-collapse: collapse;
+}
+
+.data-table thead {
+  background: #f1f5f9;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+.data-table-row {
+  border-top: 1px solid #e5e7eb;
+}
+
+.data-table-cell {
+  padding: 8px 12px;
+}
+
+/* Ejemplos de columnas con ancho fijo */
+
+.col-sm {
+  width: 120px;
+}
+
+.col-md {
+  width: 180px;
+}
+
+.col-lg {
+  width: 240px;
+}
+
+/* ===== MENSAJES ===== */
+
+.message,
+.form-message,
+.list-message {
+  font-size: 12px;
+}
+
+.message--error,
+.form-message-error,
+.list-message-error {
+  color: #dc2626;
+}
+
+.message--ok,
+.form-message-success,
+.list-message-success {
+  color: #16a34a;
+}
+
+/* ===== LAYOUT DE DETALLES (ej. ProductDetail) ===== */
+
+.detail-card {
+  max-width: 600px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  padding: 16px;
+}
+
+.detail-back-btn {
+  border: none;
+  background: none;
+  color: #0f766e;
+  cursor: pointer;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* ===== CABECERA DE PÁGINA (LISTAS) ===== */
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.page-header-title {
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.page-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ===== PÁGINA DE MOVIMIENTOS / INGRESOS / DESPACHOS (DETALLES) ===== */
+
+/* Formulario general de movimientos (Ingresos / Despachos) */
+.mov-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  max-width: 1000px;
+}
+
+/* Grid para Bodega / Cliente arriba */
+.mov-form-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Input de búsqueda de producto en detalle */
+.mov-detail-search {
+  max-width: 400px;
+  margin-bottom: 8px;
+}
+
+/* Fila de detalle: producto, tipo precio, cantidad, precio, total, motivo, botón */
+.mov-detail-row {
+  display: grid;
+  grid-template-columns: 2.5fr 1.4fr 1.6fr 1.6fr 1.6fr 2fr auto;
+  gap: 8px;
+  margin-bottom: 6px;
+  align-items: center;
+}
+
+/* Fila con stock bajo */
+.stock-low-row {
+  background-color: #fee2e2;
+}
+
+/* Chip rojo "Stock bajo" */
+.stock-low-badge {
+  margin-left: 6px;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #b91c1c;
+  color: #fff;
+}
+
+
+/* Contenedor cantidad + hints debajo (ejemplo "1 caja = X unidades") */
+.mov-detail-extra {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Textos pequeños debajo de cantidad (hints) */
+.mov-detail-hint {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Contenedor precio + chip */
+.mov-detail-price {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}

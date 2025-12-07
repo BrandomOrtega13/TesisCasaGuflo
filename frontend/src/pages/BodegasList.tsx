@@ -14,6 +14,7 @@ export default function BodegasList() {
   const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   const navigate = useNavigate();
 
@@ -60,48 +61,86 @@ export default function BodegasList() {
     }
   };
 
-  const rows = showInactive ? inactivos : activos;
+  const onHardDelete = async (id: string) => {
+    if (
+      !window.confirm(
+        '¿Eliminar definitivamente esta bodega? Esta acción no se puede deshacer.'
+      )
+    )
+      return;
+    try {
+      await api.delete(`/bodegas/${id}/hard`);
+      load();
+    } catch (err: any) {
+      console.error(err);
+      const m =
+        err?.response?.data?.message ||
+        'Error al eliminar definitivamente la bodega';
+      setMsg(m);
+    }
+  };
+
+  const baseRows = showInactive ? inactivos : activos;
+
+  const filtered = baseRows.filter((b) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return (
+      b.nombre.toLowerCase().includes(q) ||
+      (b.direccion || '').toLowerCase().includes(q)
+    );
+  });
+
+  const msgClass =
+    msg && msg.includes('Error')
+      ? 'list-message list-message-error'
+      : msg
+      ? 'list-message list-message-success'
+      : 'list-message';
 
   return (
     <div>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          marginBottom: 12,
-          alignItems: 'center',
-        }}
-      >
-        <h2>Bodegas</h2>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={() => setShowInactive(false)}
-            style={{
-              ...pill,
-              background: !showInactive ? '#000' : '#e5e7eb',
-              color: !showInactive ? '#fff' : '#111827',
-            }}
-          >
-            Activas
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowInactive(true)}
-            style={{
-              ...pill,
-              background: showInactive ? '#000' : '#e5e7eb',
-              color: showInactive ? '#fff' : '#111827',
-            }}
-          >
-            Inactivas
-          </button>
+      <div className="page-header">
+        <h2 className="page-header-title">Bodegas</h2>
+        <div className="page-header-actions">
+          <input
+            type="text"
+            placeholder="Buscar por nombre o dirección..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="search-input"
+          />
+
+          <div className="segmented">
+            <button
+              type="button"
+              onClick={() => setShowInactive(false)}
+              className={
+                !showInactive
+                  ? 'segmented-button segmented-button--active'
+                  : 'segmented-button'
+              }
+            >
+              Activas
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowInactive(true)}
+              className={
+                showInactive
+                  ? 'segmented-button segmented-button--active'
+                  : 'segmented-button'
+              }
+            >
+              Inactivas
+            </button>
+          </div>
 
           {!showInactive && (
             <button
               type="button"
               onClick={() => navigate('/bodegas/nuevo')}
-              style={btnPrimary}
+              className="btn-primary"
             >
               + Nueva bodega
             </button>
@@ -109,68 +148,69 @@ export default function BodegasList() {
         </div>
       </div>
 
-      {loading && <p>Cargando...</p>}
-      {msg && (
-        <p
-          style={{
-            fontSize: 12,
-            color: msg.includes('Error') ? '#dc2626' : '#16a34a',
-          }}
-        >
-          {msg}
-        </p>
-      )}
+      {loading && <p className="list-message">Cargando...</p>}
+      {msg && <p className={msgClass}>{msg}</p>}
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+      <div className="table-container">
+        <table className="table">
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-              <th style={th}>Nombre</th>
-              <th style={th}>Dirección</th>
-              <th style={th}>Acciones</th>
+            <tr>
+              <th className="table-header-cell">Nombre</th>
+              <th className="table-header-cell">Dirección</th>
+              <th className="table-header-cell">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((b) => (
-              <tr key={b.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={td}>{b.nombre}</td>
-                <td style={td}>{b.direccion || '—'}</td>
-                <td style={td}>
+            {filtered.map((b) => (
+              <tr key={b.id} className="table-row">
+                <td className="table-cell">{b.nombre}</td>
+                <td className="table-cell">{b.direccion || '—'}</td>
+                <td className="table-cell">
                   {!showInactive ? (
                     <>
                       <button
                         type="button"
                         onClick={() => navigate(`/bodegas/${b.id}`)}
-                        style={linkBtn}
+                        className="link-btn"
                       >
                         Editar
                       </button>
                       <button
                         type="button"
                         onClick={() => onDelete(b.id)}
-                        style={linkBtnDanger}
+                        className="link-btn link-btn-danger"
                       >
                         Desactivar
                       </button>
                     </>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => onReactivate(b.id)}
-                      style={linkBtn}
-                    >
-                      Reactivar
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onReactivate(b.id)}
+                        className="link-btn"
+                      >
+                        Reactivar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onHardDelete(b.id)}
+                        className="link-btn link-btn-danger"
+                      >
+                        Eliminar
+                      </button>
+                    </>
                   )}
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && (
+
+            {filtered.length === 0 && (
               <tr>
-                <td colSpan={3} style={{ ...td, textAlign: 'center', padding: 16 }}>
+                <td className="table-cell-empty" colSpan={3}>
                   {showInactive
-                    ? 'No hay bodegas inactivas.'
-                    : 'No hay bodegas registradas.'}
+                    ? 'No hay bodegas inactivas que coincidan con la búsqueda.'
+                    : 'No hay bodegas registradas que coincidan con la búsqueda.'}
                 </td>
               </tr>
             )}
@@ -180,47 +220,3 @@ export default function BodegasList() {
     </div>
   );
 }
-
-const th: React.CSSProperties = {
-  padding: '8px 6px',
-  fontWeight: 600,
-  fontSize: 12,
-  textTransform: 'uppercase',
-  color: '#64748b',
-};
-
-const td: React.CSSProperties = {
-  padding: '6px 6px',
-};
-
-const pill: React.CSSProperties = {
-  borderRadius: 999,
-  padding: '4px 10px',
-  border: 'none',
-  cursor: 'pointer',
-  fontSize: 12,
-};
-
-const btnPrimary: React.CSSProperties = {
-  padding: '6px 10px',
-  borderRadius: 6,
-  border: 'none',
-  background: '#000',
-  color: '#fff',
-  cursor: 'pointer',
-  fontSize: 13,
-};
-
-const linkBtn: React.CSSProperties = {
-  border: 'none',
-  background: 'none',
-  color: '#0f766e',
-  cursor: 'pointer',
-  fontSize: 12,
-  marginRight: 6,
-};
-
-const linkBtnDanger: React.CSSProperties = {
-  ...linkBtn,
-  color: '#b91c1c',
-};

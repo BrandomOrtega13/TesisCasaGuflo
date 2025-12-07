@@ -7,6 +7,7 @@ import movimientosRoutes from './routes/movimientos.routes';
 import bodegasRoutes from './routes/bodegas.routes';
 import proveedoresRoutes from './routes/proveedores.routes';
 import clientesRoutes from './routes/clientes.routes';
+import categoriasRouter from './routes/categorias.routes';
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use('/bodegas', bodegasRoutes);
 app.use('/proveedores', proveedoresRoutes);
 app.use('/movimientos', movimientosRoutes);
 app.use('/clientes', clientesRoutes);
+app.use("/categorias", categoriasRouter);
 
 // Puerto (usa el del .env o 4000 por defecto)
 const PORT = process.env.PORT || 4000;

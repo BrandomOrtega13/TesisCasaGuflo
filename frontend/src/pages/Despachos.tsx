@@ -17,11 +17,11 @@ type PrecioTipo = 'NORMAL' | 'MAYORISTA' | 'CAJA' | 'DESCUENTO';
 
 type Detalle = {
   producto_id: string;
-  cantidad: number;            // SIEMPRE en unidades
-  precio_unitario?: number;    // precio por unidad o por caja (según tipo)
+  cantidad: number; // SIEMPRE en unidades
+  precio_unitario?: number;
   precio_tipo: PrecioTipo;
   motivo_descuento?: string;
-  cajas?: number;              // solo UI cuando es CAJA
+  cajas?: number;
 };
 
 export default function Despachos() {
@@ -29,7 +29,11 @@ export default function Despachos() {
   const [clientes, setClientes] = useState<Opcion[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
 
-  const defaultDetalle: Detalle = { producto_id: '', cantidad: 1, precio_tipo: 'NORMAL' };
+  const defaultDetalle: Detalle = {
+    producto_id: '',
+    cantidad: 0,
+    precio_tipo: 'NORMAL',
+  };
 
   const [bodegaId, setBodegaId] = useState('');
   const [clienteId, setClienteId] = useState('');
@@ -39,7 +43,11 @@ export default function Despachos() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  // cargar catálogos
+  // búsqueda
+  const [searchBodega, setSearchBodega] = useState('');
+  const [searchCliente, setSearchCliente] = useState('');
+  const [searchProducto, setSearchProducto] = useState('');
+
   useEffect(() => {
     const load = async () => {
       try {
@@ -70,103 +78,82 @@ export default function Despachos() {
   }, []);
 
   // precio base según tipo
-  const getPriceFor = (prod: Producto | undefined, tipo: PrecioTipo, fallback?: number) => {
+  const getPriceFor = (
+    prod: Producto | undefined,
+    tipo: PrecioTipo,
+    fallback?: number
+  ) => {
     if (!prod) return fallback ?? 0;
+
     if (tipo === 'NORMAL') return prod.precio_venta || 0;
-    if (tipo === 'MAYORISTA') return prod.precio_mayorista || prod.precio_venta || 0;
-    if (tipo === 'CAJA') return prod.precio_caja || 0;
+
+    if (tipo === 'MAYORISTA') {
+      return prod.precio_mayorista || prod.precio_venta || 0;
+    }
+
+    if (tipo === 'CAJA') {
+      // precio_caja ya es el PRECIO POR UNIDAD en modo caja
+      return prod.precio_caja || 0;
+    }
+
     // DESCUENTO
     return fallback ?? (prod.precio_venta || 0);
   };
 
   const updateDetalle = (index: number, patch: Partial<Detalle>) => {
-    setDetalles((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)));
+    setDetalles((prev) =>
+      prev.map((d, i) => (i === index ? { ...d, ...patch } : d))
+    );
   };
 
   const onChangeProducto = (i: number, producto_id: string) => {
     const d = detalles[i];
     const prod = productos.find((p) => p.id === producto_id);
 
-    // ¿este producto soporta CAJA?
-    const hasCaja =
-      !!prod &&
-      !!prod.unidades_por_caja &&
-      prod.unidades_por_caja > 0 &&
-      !!prod.precio_caja &&
-      prod.precio_caja > 0;
-
     let tipo = d.precio_tipo;
-    if (tipo === 'CAJA' && !hasCaja) {
-      // si estaba en CAJA pero el nuevo producto no soporta caja, bajamos a NORMAL
-      tipo = 'NORMAL';
-    }
 
     const precioBase = getPriceFor(prod, tipo, d.precio_unitario);
-    const precio = tipo === 'DESCUENTO'
-      ? (d.precio_unitario ?? precioBase)
-      : precioBase;
+    const precio =
+      tipo === 'DESCUENTO' ? d.precio_unitario ?? precioBase : precioBase;
 
     updateDetalle(i, {
       producto_id,
       precio_tipo: tipo,
-      precio_unitario: precio,
+      precio_unitario: tipo === 'DESCUENTO' ? d.precio_unitario : precio,
     });
   };
 
   const onChangePrecioTipo = (i: number, precio_tipo: PrecioTipo) => {
     const d = detalles[i];
     const prod = productos.find((p) => p.id === d.producto_id);
-    let precio = getPriceFor(prod, precio_tipo, d.precio_unitario);
-    let cantidad = d.cantidad;
-    let cajas: number | undefined = d.cajas ?? 1;
 
-    if (precio_tipo === 'CAJA') {
-      const upc = prod?.unidades_por_caja || 1;
-      cantidad = (cajas ?? 1) * upc; // cantidad en unidades
-    } else {
-      cajas = undefined;
-    }
+    let precio = getPriceFor(prod, precio_tipo, d.precio_unitario);
 
     if (precio_tipo !== 'DESCUENTO') {
-      // precio fijo, no editable
+      // precio fijo (venta / mayorista / caja)
       updateDetalle(i, {
         precio_tipo,
         precio_unitario: precio,
-        cantidad,
-        cajas,
+        cajas: undefined,
         motivo_descuento: undefined,
       });
     } else {
-      // descuento: editable, si no hay precio ponemos precio venta como base
-      if (d.precio_unitario == null) precio = prod?.precio_venta || 0;
+      // DESCUENTO: el usuario define el precio manualmente
+      if (d.precio_unitario == null) {
+        precio = prod?.precio_venta || 0;
+      }
       updateDetalle(i, {
         precio_tipo,
         precio_unitario: precio,
-        cantidad,
-        cajas,
+        cajas: undefined,
       });
     }
   };
 
   const onChangeCantidad = (i: number, value: number) => {
-    const d = detalles[i];
-    if (d.precio_tipo === 'CAJA') {
-      // en CAJA se maneja por cajas, no por unidades
-      return;
-    }
-    const cantidad = Math.max(1, Number(value) || 1);
+    const n = Number(value);
+    const cantidad = Number.isFinite(n) ? n : 0;
     updateDetalle(i, { cantidad });
-  };
-
-  const onChangeCajas = (i: number, value: number) => {
-    const d = detalles[i];
-    const prod = productos.find((p) => p.id === d.producto_id);
-    const upc = prod?.unidades_por_caja || 1;
-    const cajas = Math.max(1, Number(value) || 1);
-    updateDetalle(i, {
-      cajas,
-      cantidad: cajas * upc, // cantidad en unidades
-    });
   };
 
   const addDetalle = () =>
@@ -185,14 +172,17 @@ export default function Despachos() {
         .filter((d) => d.producto_id && d.cantidad > 0)
         .map((d) => ({
           producto_id: d.producto_id,
-          cantidad: d.cantidad, // en unidades
+          cantidad: d.cantidad,
           precio_unitario: d.precio_unitario ?? null,
           precio_tipo: d.precio_tipo || null,
-          motivo_descuento: d.precio_tipo === 'DESCUENTO' ? (d.motivo_descuento || null) : null,
+          motivo_descuento:
+            d.precio_tipo === 'DESCUENTO'
+              ? d.motivo_descuento || null
+              : null,
         }));
 
       if (!bodegaId || limpios.length === 0) {
-        setMsg('Seleccione bodega y al menos un producto');
+        setMsg('Seleccione bodega y al menos un producto con cantidad > 0');
         setLoading(false);
         return;
       }
@@ -231,37 +221,62 @@ export default function Despachos() {
     return map[tipo];
   };
 
-  // total de una línea
   const getLineaTotal = (d: Detalle) => {
     const precio = d.precio_unitario ?? 0;
     if (!precio) return 0;
-    if (d.precio_tipo === 'CAJA') {
-      // total = cajas * precio_caja
-      return (d.cajas ?? 0) * precio;
-    }
-    // otros: total = cantidad * precio_unitario
     return d.cantidad * precio;
   };
 
-  return (
-    <div>
-      <h2>Despachos</h2>
+  // ---- LISTAS FILTRADAS ----
 
-      <form
-        onSubmit={onSubmit}
-        style={{ display: 'grid', gap: 12, marginTop: 16, maxWidth: 1000 }}
-      >
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-          <div>
-            <label>Bodega</label>
+  const bodegasFiltradasBase = bodegas.filter((b) =>
+    b.nombre.toLowerCase().includes(searchBodega.toLowerCase())
+  );
+  const selectedBodega = bodegas.find((b) => b.id === bodegaId);
+  const bodegasFiltradas = selectedBodega
+    ? bodegasFiltradasBase.some((b) => b.id === selectedBodega.id)
+      ? bodegasFiltradasBase
+      : [selectedBodega, ...bodegasFiltradasBase]
+    : bodegasFiltradasBase;
+
+  const clientesFiltradosBase = clientes.filter((c) =>
+    c.nombre.toLowerCase().includes(searchCliente.toLowerCase())
+  );
+  const selectedCliente = clientes.find((c) => c.id === clienteId);
+  const clientesFiltrados = selectedCliente
+    ? clientesFiltradosBase.some((c) => c.id === selectedCliente.id)
+      ? clientesFiltradosBase
+      : [selectedCliente, ...clientesFiltradosBase]
+    : clientesFiltradosBase;
+
+  const productosFiltradosBase = productos.filter((p) => {
+    const texto = `${p.sku} ${p.nombre}`.toLowerCase();
+    return texto.includes(searchProducto.toLowerCase());
+  });
+
+  return (
+    <div className="app-page">
+      <h2 className="page-header-title">Despachos</h2>
+
+      <form onSubmit={onSubmit} className="mov-form">
+        {/* Bodega y cliente */}
+        <div className="mov-form-top">
+          <div className="form-field">
+            <label className="form-label">Bodega</label>
+            <input
+              placeholder="Buscar bodega..."
+              value={searchBodega}
+              onChange={(e) => setSearchBodega(e.target.value)}
+              className="input"
+            />
             <select
               value={bodegaId}
               onChange={(e) => setBodegaId(e.target.value)}
               required
-              style={input}
+              className="select"
             >
               <option value="">Seleccione bodega</option>
-              {bodegas.map((b) => (
+              {bodegasFiltradas.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.nombre}
                 </option>
@@ -269,15 +284,21 @@ export default function Despachos() {
             </select>
           </div>
 
-          <div>
-            <label>Cliente (opcional)</label>
+          <div className="form-field">
+            <label className="form-label">Cliente (opcional)</label>
+            <input
+              placeholder="Buscar cliente..."
+              value={searchCliente}
+              onChange={(e) => setSearchCliente(e.target.value)}
+              className="input"
+            />
             <select
               value={clienteId}
               onChange={(e) => setClienteId(e.target.value)}
-              style={input}
+              className="select"
             >
               <option value="">Sin cliente</option>
-              {clientes.map((c) => (
+              {clientesFiltrados.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nombre}
                 </option>
@@ -286,40 +307,65 @@ export default function Despachos() {
           </div>
         </div>
 
-        <div>
-          <label>Observación</label>
+        {/* Observación */}
+        <div className="form-field">
+          <label className="form-label">Observación</label>
           <input
             value={observacion}
             onChange={(e) => setObservacion(e.target.value)}
-            style={input}
+            className="input"
           />
         </div>
 
+        {/* Detalle */}
         <div>
           <h4>Detalle</h4>
+
+          <input
+            placeholder="Buscar producto (SKU o nombre)..."
+            value={searchProducto}
+            onChange={(e) => setSearchProducto(e.target.value)}
+            className="input mov-detail-search"
+          />
+
           {detalles.map((d, i) => {
             const prod = productos.find((p) => p.id === d.producto_id);
-            const upc = prod?.unidades_por_caja || 1;
-            const hasCaja =
-              !!prod &&
-              !!prod.unidades_por_caja &&
-              prod.unidades_por_caja > 0 &&
-              !!prod.precio_caja &&
-              prod.precio_caja > 0;
+            const upc = prod?.unidades_por_caja || 0;
+
+            const opcionesProducto = (() => {
+              const base = [...productosFiltradosBase];
+              const seleccionado = productos.find(
+                (p) => p.id === d.producto_id
+              );
+              if (
+                seleccionado &&
+                !base.some((p) => p.id === seleccionado.id)
+              ) {
+                return [seleccionado, ...base];
+              }
+              return base;
+            })();
 
             const totalLinea = getLineaTotal(d);
 
+            let cajasEq = 0;
+            let restoEq = 0;
+            if (d.precio_tipo === 'CAJA' && upc > 0 && d.cantidad > 0) {
+              cajasEq = Math.floor(d.cantidad / upc);
+              restoEq = d.cantidad % upc;
+            }
+
             return (
-              <div key={i} style={row}>
+              <div key={i} className="mov-detail-row">
                 {/* Producto */}
                 <select
                   value={d.producto_id}
                   onChange={(e) => onChangeProducto(i, e.target.value)}
                   required
-                  style={input}
+                  className="select"
                 >
                   <option value="">Seleccione producto</option>
-                  {productos.map((p) => (
+                  {opcionesProducto.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.sku} - {p.nombre}
                     </option>
@@ -332,48 +378,43 @@ export default function Despachos() {
                   onChange={(e) =>
                     onChangePrecioTipo(i, e.target.value as PrecioTipo)
                   }
-                  style={input}
+                  className="select"
                 >
                   <option value="NORMAL">Venta</option>
                   <option value="MAYORISTA">Mayorista</option>
-                  <option value="CAJA" disabled={!hasCaja}>
-                    Caja
-                  </option>
+                  <option value="CAJA">Caja</option>
                   <option value="DESCUENTO">Descuento</option>
                 </select>
 
-                {/* Cantidad / Cajas */}
-                {d.precio_tipo === 'CAJA' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    <input
-                      type="number"
-                      min={1}
-                      placeholder="Cajas"
-                      value={d.cajas ?? 1}
-                      onChange={(e) => onChangeCajas(i, Number(e.target.value))}
-                      style={input}
-                    />
-                    {prod && upc > 0 && (
-                      <span style={{ fontSize: 11, color: '#64748b' }}>
-                        1 caja = {upc} unidades
-                      </span>
-                    )}
-                  </div>
-                ) : (
+                {/* Cantidad + equivalencias */}
+                <div className="mov-detail-extra">
                   <input
                     type="number"
-                    min={1}
                     placeholder="Cantidad (unidades)"
-                    value={d.cantidad}
+                    value={d.cantidad || ''}
                     onChange={(e) =>
                       onChangeCantidad(i, Number(e.target.value))
                     }
-                    style={input}
+                    className="input"
                   />
-                )}
+                  {d.precio_tipo === 'CAJA' && upc > 0 && (
+                    <>
+                      <span className="mov-detail-hint">
+                        1 caja = {upc} unidades
+                      </span>
+                      {d.cantidad > 0 && (
+                        <span className="mov-detail-hint">
+                          Equivale a{' '}
+                          {cajasEq > 0 ? `${cajasEq} caja(s)` : '0 cajas'}
+                          {restoEq > 0 ? ` + ${restoEq} unidad(es)` : ''}
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
 
-                {/* Precio (por unidad o por caja) */}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {/* Precio */}
+                <div className="mov-detail-price">
                   <input
                     type="number"
                     step="0.01"
@@ -385,37 +426,36 @@ export default function Despachos() {
                         precio_unitario: Number(e.target.value) || 0,
                       });
                     }}
-                    style={input}
+                    className="input"
                     readOnly={isReadOnlyPrice(d.precio_tipo)}
                   />
-                  <span style={chip}>{tipoBadge(d.precio_tipo)}</span>
+                  <span className="btn-chip">{tipoBadge(d.precio_tipo)}</span>
                 </div>
 
-                {/* Total de la línea */}
+                {/* Total */}
                 <input
                   readOnly
                   value={totalLinea ? totalLinea.toFixed(2) : ''}
                   placeholder="Total"
-                  style={input}
+                  className="input"
                 />
 
-                {/* Motivo descuento (solo en DESCUENTO) */}
+                {/* Motivo descuento */}
                 <input
                   placeholder="Motivo desc. (opcional)"
                   value={d.motivo_descuento ?? ''}
                   onChange={(e) =>
                     updateDetalle(i, { motivo_descuento: e.target.value })
                   }
-                  style={input}
+                  className="input"
                   readOnly={d.precio_tipo !== 'DESCUENTO'}
                 />
 
-                {/* Quitar línea */}
                 {detalles.length > 1 && (
                   <button
                     type="button"
                     onClick={() => removeDetalle(i)}
-                    style={btnDel}
+                    className="btn btn-icon-danger"
                   >
                     ✕
                   </button>
@@ -424,21 +464,27 @@ export default function Despachos() {
             );
           })}
 
-          <button type="button" onClick={addDetalle} style={btnAdd}>
+          <button
+            type="button"
+            onClick={addDetalle}
+            className="btn btn-secondary"
+          >
             + Agregar línea
           </button>
         </div>
 
-        <button type="submit" disabled={loading} style={btnSubmit}>
+        <button type="submit" disabled={loading} className="btn-primary">
           {loading ? 'Guardando...' : 'Registrar despacho'}
         </button>
 
         {msg && (
           <p
-            style={{
-              fontSize: 12,
-              color: msg.includes('Error') ? '#dc2626' : '#16a34a',
-            }}
+            className={
+              'form-message ' +
+              (msg.includes('Error')
+                ? 'form-message-error'
+                : 'form-message-success')
+            }
           >
             {msg}
           </p>
@@ -447,53 +493,3 @@ export default function Despachos() {
     </div>
   );
 }
-
-const input: React.CSSProperties = {
-  padding: '6px 8px',
-  borderRadius: 6,
-  border: '1px solid #cbd5e1',
-  fontSize: 13,
-};
-
-const row: React.CSSProperties = {
-  display: 'grid',
-  gridTemplateColumns: '2.5fr 1.4fr 1.4fr 1.6fr 1.6fr 2fr auto',
-  gap: 8,
-  marginBottom: 6,
-  alignItems: 'center',
-};
-
-const chip: React.CSSProperties = {
-  fontSize: 11,
-  background: '#e2e8f0',
-  borderRadius: 999,
-  padding: '2px 8px',
-  border: '1px solid #cbd5e1',
-};
-
-const btnAdd: React.CSSProperties = {
-  padding: '4px 8px',
-  borderRadius: 6,
-  border: '1px solid #cbd5e1',
-  background: '#f8fafc',
-  fontSize: 12,
-  cursor: 'pointer',
-};
-
-const btnDel: React.CSSProperties = {
-  padding: '4px 6px',
-  borderRadius: 6,
-  border: 'none',
-  background: '#fee2e2',
-  cursor: 'pointer',
-};
-
-const btnSubmit: React.CSSProperties = {
-  marginTop: 8,
-  padding: '8px 12px',
-  borderRadius: 6,
-  background: '#000',
-  color: '#fff',
-  border: 'none',
-  cursor: 'pointer',
-};

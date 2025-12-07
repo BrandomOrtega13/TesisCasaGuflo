@@ -176,4 +176,43 @@ router.put('/:id/reactivar', async (req, res) => {
   }
 });
 
+router.delete('/:id/hard', async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    await client.query(
+      `UPDATE movimientos
+       SET cliente_id = NULL
+       WHERE cliente_id = $1`,
+      [id]
+    );
+
+    const delRes = await client.query(
+      `DELETE FROM clientes
+       WHERE id = $1`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+
+    if (delRes.rowCount === 0) {
+      return res.status(404).json({ message: 'Cliente no encontrado' });
+    }
+
+    return res.status(204).send();
+  } catch (err: any) {
+    await client.query('ROLLBACK');
+    console.error('Error en DELETE /clientes/:id/hard', err.message || err);
+    return res
+      .status(500)
+      .json({ message: 'Error al eliminar cliente', detail: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+
 export default router;

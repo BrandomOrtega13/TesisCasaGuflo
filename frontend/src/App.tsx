@@ -15,6 +15,9 @@ import ClientesList from './pages/ClientesList';
 import ClienteForm from './pages/ClienteForm';
 import BodegasList from './pages/BodegasList';
 import BodegaForm from './pages/BodegaForm';
+import ProductDetail from './pages/ProductDetail';
+import CategoriasList from './pages/CategoriasList';
+import CategoriaForm from './pages/CategoriaForm';
 
 function NotFound() {
   return <div style={{ padding: 16 }}>Página no encontrada</div>;
@@ -40,6 +43,11 @@ export default function App() {
         {/* Inventario */}
         <Route path="productos" element={<ProductsList />} />
         <Route path="productos/:id" element={<ProductForm />} />
+        <Route path="productos/:id/detalle" element={<ProductDetail />} />
+
+        {/* Categorias */}
+        <Route path="categorias" element={<CategoriasList />} />
+        <Route path="categorias/:id" element={<CategoriaForm />} />
 
         {/* Operaciones */}
         <Route path="ingresos" element={<Ingresos />} />

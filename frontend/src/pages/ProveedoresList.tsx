@@ -16,6 +16,7 @@ export default function ProveedoresList() {
   const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   const navigate = useNavigate();
 
@@ -62,48 +63,81 @@ export default function ProveedoresList() {
     }
   };
 
-  const rows = showInactive ? inactivos : activos;
+  const onHardDelete = async (id: string) => {
+    if (
+      !window.confirm(
+        '¿Eliminar definitivamente este proveedor a pesar de que tiene movimientos? Esta acción no se puede deshacer.'
+      )
+    )
+      return;
+    try {
+      await api.delete(`/proveedores/${id}/hard`);
+      load();
+    } catch (err: any) {
+      console.error(err);
+      const m =
+        err?.response?.data?.message ||
+        'Error al eliminar definitivamente el proveedor';
+      setMsg(m);
+    }
+  };
+
+  const baseRows = showInactive ? inactivos : activos;
+
+  const rows = baseRows.filter((p) => {
+    if (!query.trim()) return true;
+    const q = query.toLowerCase();
+    return (
+      p.nombre.toLowerCase().includes(q) ||
+      (p.contacto || '').toLowerCase().includes(q) ||
+      (p.telefono || '').toLowerCase().includes(q) ||
+      (p.correo || '').toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div>
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          marginBottom: 12,
-          alignItems: 'center',
-        }}
-      >
-        <h2>Proveedores</h2>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={() => setShowInactive(false)}
-            style={{
-              ...pill,
-              background: !showInactive ? '#000' : '#e5e7eb',
-              color: !showInactive ? '#fff' : '#111827',
-            }}
-          >
-            Activos
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowInactive(true)}
-            style={{
-              ...pill,
-              background: showInactive ? '#000' : '#e5e7eb',
-              color: showInactive ? '#fff' : '#111827',
-            }}
-          >
-            Inactivos
-          </button>
+      {/* CABECERA */}
+      <div className="page-header">
+        <h2 className="page-header-title">Proveedores</h2>
+
+        <div className="page-header-actions">
+          <input
+            type="text"
+            placeholder="Buscar por nombre, contacto, teléfono..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="search-input"
+          />
+
+          <div className="segmented">
+            <button
+              type="button"
+              onClick={() => setShowInactive(false)}
+              className={
+                'segmented-button ' +
+                (!showInactive ? 'segmented-button--active' : '')
+              }
+            >
+              Activos
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowInactive(true)}
+              className={
+                'segmented-button ' +
+                (showInactive ? 'segmented-button--active' : '')
+              }
+            >
+              Inactivos
+            </button>
+          </div>
 
           {!showInactive && (
             <button
               type="button"
               onClick={() => navigate('/proveedores/nuevo')}
-              style={btnPrimary}
+              className="btn-primary"
             >
               + Nuevo proveedor
             </button>
@@ -111,72 +145,86 @@ export default function ProveedoresList() {
         </div>
       </div>
 
-      {loading && <p>Cargando...</p>}
+      {/* MENSAJES */}
+      {loading && <p className="list-message">Cargando...</p>}
       {msg && (
         <p
-          style={{
-            fontSize: 12,
-            color: msg.includes('Error') ? '#dc2626' : '#16a34a',
-          }}
+          className={
+            'list-message ' +
+            (msg.includes('Error')
+              ? 'list-message-error'
+              : 'list-message-success')
+          }
         >
           {msg}
         </p>
       )}
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+      {/* TABLA */}
+      <div className="table-container">
+        <table className="table">
           <thead>
-            <tr style={{ textAlign: 'left', borderBottom: '1px solid #e5e7eb' }}>
-              <th style={th}>Nombre</th>
-              <th style={th}>Contacto</th>
-              <th style={th}>Teléfono</th>
-              <th style={th}>Correo</th>
-              <th style={th}>Acciones</th>
+            <tr>
+              <th className="table-header-cell">Nombre</th>
+              <th className="table-header-cell">Contacto</th>
+              <th className="table-header-cell">Teléfono</th>
+              <th className="table-header-cell">Correo</th>
+              <th className="table-header-cell">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((p) => (
-              <tr key={p.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                <td style={td}>{p.nombre}</td>
-                <td style={td}>{p.contacto || '—'}</td>
-                <td style={td}>{p.telefono || '—'}</td>
-                <td style={td}>{p.correo || '—'}</td>
-                <td style={td}>
+              <tr key={p.id} className="table-row">
+                <td className="table-cell">{p.nombre}</td>
+                <td className="table-cell">{p.contacto || '—'}</td>
+                <td className="table-cell">{p.telefono || '—'}</td>
+                <td className="table-cell">{p.correo || '—'}</td>
+                <td className="table-cell">
                   {!showInactive ? (
                     <>
                       <button
                         type="button"
                         onClick={() => navigate(`/proveedores/${p.id}`)}
-                        style={linkBtn}
+                        className="link-btn"
                       >
                         Editar
                       </button>
                       <button
                         type="button"
                         onClick={() => onDelete(p.id)}
-                        style={linkBtnDanger}
+                        className="link-btn link-btn-danger"
                       >
                         Desactivar
                       </button>
                     </>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => onReactivate(p.id)}
-                      style={linkBtn}
-                    >
-                      Reactivar
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onReactivate(p.id)}
+                        className="link-btn"
+                      >
+                        Reactivar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onHardDelete(p.id)}
+                        className="link-btn link-btn-danger"
+                      >
+                        Eliminar
+                      </button>
+                    </>
                   )}
                 </td>
               </tr>
             ))}
+
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ ...td, textAlign: 'center', padding: 16 }}>
+                <td colSpan={5} className="table-cell table-cell-empty">
                   {showInactive
-                    ? 'No hay proveedores inactivos.'
-                    : 'No hay proveedores registrados.'}
+                    ? 'No hay proveedores inactivos que coincidan con la búsqueda.'
+                    : 'No hay proveedores registrados que coincidan con la búsqueda.'}
                 </td>
               </tr>
             )}
@@ -186,47 +234,3 @@ export default function ProveedoresList() {
     </div>
   );
 }
-
-const th: React.CSSProperties = {
-  padding: '8px 6px',
-  fontWeight: 600,
-  fontSize: 12,
-  textTransform: 'uppercase',
-  color: '#64748b',
-};
-
-const td: React.CSSProperties = {
-  padding: '6px 6px',
-};
-
-const pill: React.CSSProperties = {
-  borderRadius: 999,
-  padding: '4px 10px',
-  border: 'none',
-  cursor: 'pointer',
-  fontSize: 12,
-};
-
-const btnPrimary: React.CSSProperties = {
-  padding: '6px 10px',
-  borderRadius: 6,
-  border: 'none',
-  background: '#000',
-  color: '#fff',
-  cursor: 'pointer',
-  fontSize: 13,
-};
-
-const linkBtn: React.CSSProperties = {
-  border: 'none',
-  background: 'none',
-  color: '#0f766e',
-  cursor: 'pointer',
-  fontSize: 12,
-  marginRight: 6,
-};
-
-const linkBtnDanger: React.CSSProperties = {
-  ...linkBtn,
-  color: '#b91c1c',
-};

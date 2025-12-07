@@ -72,73 +72,55 @@ export default function BodegaForm() {
     }
   };
 
+  const msgClass =
+    msg && msg.includes('Error')
+      ? 'form-message form-message-error'
+      : msg
+      ? 'form-message form-message-success'
+      : 'form-message';
+
   return (
-    <div
-      style={{
-        maxWidth: 500,
-        background: '#fff',
-        borderRadius: 8,
-        border: '1px solid #e5e7eb',
-        padding: 16,
-      }}
-    >
-      <h2 style={{ marginBottom: 12 }}>
-        {isNew ? 'Nueva bodega' : 'Editar bodega'}
-      </h2>
-
-      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 10 }}>
-        <div>
-          <label>Nombre *</label>
-          <input
-            name="nombre"
-            value={form.nombre}
-            onChange={onChange}
-            style={input}
-          />
-        </div>
-        <div>
-          <label>Dirección</label>
-          <input
-            name="direccion"
-            value={form.direccion}
-            onChange={onChange}
-            style={input}
-          />
-        </div>
-
-        <button type="submit" disabled={loading} style={btnSubmit}>
-          {loading ? 'Guardando...' : 'Guardar'}
+    <div className="form-page">
+      <div className="card">
+        <button
+          type="button"
+          onClick={() => navigate('/bodegas')}
+          className="btn-link-back"
+        >
+          ← Volver
         </button>
 
-        {msg && (
-          <p
-            style={{
-              fontSize: 12,
-              color: msg.includes('Error') ? '#dc2626' : '#16a34a',
-            }}
-          >
-            {msg}
-          </p>
-        )}
-      </form>
+        <h2 className="form-title">
+          {isNew ? 'Nueva bodega' : 'Editar bodega'}
+        </h2>
+
+        <form onSubmit={onSubmit} className="form-grid">
+          <div className="form-field">
+            <label className="form-label">Nombre *</label>
+            <input
+              name="nombre"
+              value={form.nombre}
+              onChange={onChange}
+              className="form-input"
+            />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Dirección</label>
+            <input
+              name="direccion"
+              value={form.direccion}
+              onChange={onChange}
+              className="form-input"
+            />
+          </div>
+
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading ? 'Guardando...' : 'Guardar'}
+          </button>
+
+          {msg && <p className={msgClass}>{msg}</p>}
+        </form>
+      </div>
     </div>
   );
 }
-
-const input: React.CSSProperties = {
-  width: '100%',
-  padding: '6px 8px',
-  borderRadius: 6,
-  border: '1px solid #cbd5e1',
-  fontSize: 13,
-};
-
-const btnSubmit: React.CSSProperties = {
-  marginTop: 8,
-  padding: '8px 12px',
-  borderRadius: 6,
-  background: '#000',
-  color: '#fff',
-  border: 'none',
-  cursor: 'pointer',
-};
