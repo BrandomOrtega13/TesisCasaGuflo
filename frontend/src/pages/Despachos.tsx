@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import api from '../lib/api';
 
 type Opcion = { id: string; nombre: string };
@@ -17,12 +17,17 @@ type PrecioTipo = 'NORMAL' | 'MAYORISTA' | 'CAJA' | 'DESCUENTO';
 
 type Detalle = {
   producto_id: string;
-  cantidad: number; // SIEMPRE en unidades
+  cantidad: number; // unidades
   precio_unitario?: number;
   precio_tipo: PrecioTipo;
   motivo_descuento?: string;
   cajas?: number;
 };
+
+const money = (n: number) =>
+  new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(
+    Number.isFinite(n) ? n : 0
+  );
 
 export default function Despachos() {
   const [bodegas, setBodegas] = useState<Opcion[]>([]);
@@ -77,7 +82,6 @@ export default function Despachos() {
     load();
   }, []);
 
-  // precio base según tipo
   const getPriceFor = (
     prod: Producto | undefined,
     tipo: PrecioTipo,
@@ -92,7 +96,7 @@ export default function Despachos() {
     }
 
     if (tipo === 'CAJA') {
-      // precio_caja ya es el PRECIO POR UNIDAD en modo caja
+      // precio_caja es precio por unidad (modo caja)
       return prod.precio_caja || 0;
     }
 
@@ -110,8 +114,7 @@ export default function Despachos() {
     const d = detalles[i];
     const prod = productos.find((p) => p.id === producto_id);
 
-    let tipo = d.precio_tipo;
-
+    const tipo = d.precio_tipo;
     const precioBase = getPriceFor(prod, tipo, d.precio_unitario);
     const precio =
       tipo === 'DESCUENTO' ? d.precio_unitario ?? precioBase : precioBase;
@@ -130,7 +133,6 @@ export default function Despachos() {
     let precio = getPriceFor(prod, precio_tipo, d.precio_unitario);
 
     if (precio_tipo !== 'DESCUENTO') {
-      // precio fijo (venta / mayorista / caja)
       updateDetalle(i, {
         precio_tipo,
         precio_unitario: precio,
@@ -138,7 +140,6 @@ export default function Despachos() {
         motivo_descuento: undefined,
       });
     } else {
-      // DESCUENTO: el usuario define el precio manualmente
       if (d.precio_unitario == null) {
         precio = prod?.precio_venta || 0;
       }
@@ -176,9 +177,7 @@ export default function Despachos() {
           precio_unitario: d.precio_unitario ?? null,
           precio_tipo: d.precio_tipo || null,
           motivo_descuento:
-            d.precio_tipo === 'DESCUENTO'
-              ? d.motivo_descuento || null
-              : null,
+            d.precio_tipo === 'DESCUENTO' ? d.motivo_descuento || null : null,
         }));
 
       if (!bodegaId || limpios.length === 0) {
@@ -228,7 +227,6 @@ export default function Despachos() {
   };
 
   // ---- LISTAS FILTRADAS ----
-
   const bodegasFiltradasBase = bodegas.filter((b) =>
     b.nombre.toLowerCase().includes(searchBodega.toLowerCase())
   );
@@ -254,78 +252,121 @@ export default function Despachos() {
     return texto.includes(searchProducto.toLowerCase());
   });
 
+  // total general (UI)
+  const totalGeneral = useMemo(() => {
+    return detalles.reduce((acc, d) => acc + getLineaTotal(d), 0);
+  }, [detalles]);
+
   return (
-    <div className="app-page">
-      <h2 className="page-header-title">Despachos</h2>
-
-      <form onSubmit={onSubmit} className="mov-form">
-        {/* Bodega y cliente */}
-        <div className="mov-form-top">
-          <div className="form-field">
-            <label className="form-label">Bodega</label>
-            <input
-              placeholder="Buscar bodega..."
-              value={searchBodega}
-              onChange={(e) => setSearchBodega(e.target.value)}
-              className="input"
-            />
-            <select
-              value={bodegaId}
-              onChange={(e) => setBodegaId(e.target.value)}
-              required
-              className="select"
-            >
-              <option value="">Seleccione bodega</option>
-              {bodegasFiltradas.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.nombre}
-                </option>
-              ))}
-            </select>
+    <div className="mov-page">
+      {/* HEADER */}
+      <div className="mov-header">
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+          <div>
+            <h2>Despachos</h2>
+            <p>Registra salidas de inventario y calcula totales por línea.</p>
           </div>
 
-          <div className="form-field">
-            <label className="form-label">Cliente (opcional)</label>
-            <input
-              placeholder="Buscar cliente..."
-              value={searchCliente}
-              onChange={(e) => setSearchCliente(e.target.value)}
-              className="input"
-            />
-            <select
-              value={clienteId}
-              onChange={(e) => setClienteId(e.target.value)}
-              className="select"
-            >
-              <option value="">Sin cliente</option>
-              {clientesFiltrados.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre}
-                </option>
-              ))}
-            </select>
+          <div style={{ textAlign: 'right', minWidth: 160 }}>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Total</div>
+            <div style={{ fontSize: 20, fontWeight: 900 }}>
+              {money(totalGeneral)}
+            </div>
           </div>
         </div>
 
-        {/* Observación */}
-        <div className="form-field">
-          <label className="form-label">Observación</label>
-          <input
-            value={observacion}
-            onChange={(e) => setObservacion(e.target.value)}
-            className="input"
-          />
+        {msg && (
+          <p
+            className={
+              'form-message ' +
+              (msg.includes('Error')
+                ? 'form-message-error'
+                : 'form-message-success')
+            }
+            style={{ marginTop: 12 }}
+          >
+            {msg}
+          </p>
+        )}
+      </div>
+
+      {/* FORM */}
+      <form onSubmit={onSubmit} className="mov-card">
+        {/* CABECERA */}
+        <div className="mov-section">
+          <div className="mov-section-title">Cabecera</div>
+
+          <div className="mov-grid-2">
+            {/* Bodega */}
+            <div className="form-field">
+              <label className="form-label">Bodega</label>
+              <input
+                placeholder="Buscar bodega..."
+                value={searchBodega}
+                onChange={(e) => setSearchBodega(e.target.value)}
+                className="form-input"
+              />
+              <select
+                value={bodegaId}
+                onChange={(e) => setBodegaId(e.target.value)}
+                required
+                className="form-input"
+              >
+                <option value="">Seleccione bodega</option>
+                {bodegasFiltradas.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Cliente */}
+            <div className="form-field">
+              <label className="form-label">Cliente (opcional)</label>
+              <input
+                placeholder="Buscar cliente..."
+                value={searchCliente}
+                onChange={(e) => setSearchCliente(e.target.value)}
+                className="form-input"
+              />
+              <select
+                value={clienteId}
+                onChange={(e) => setClienteId(e.target.value)}
+                className="form-input"
+              >
+                <option value="">Sin cliente</option>
+                {clientesFiltrados.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="mov-grid-1">
+            <div className="form-field">
+              <label className="form-label">Observación</label>
+              <input
+                value={observacion}
+                onChange={(e) => setObservacion(e.target.value)}
+                className="form-input"
+                placeholder="Ej: venta, pedido, despacho, devolución..."
+              />
+            </div>
+          </div>
         </div>
 
-        {/* Detalle */}
-        <div>
-          <h4>Detalle</h4>
+        {/* DETALLE */}
+        <div className="mov-section">
+          <div className="mov-section-title">Detalle</div>
 
           <input
             placeholder="Buscar producto (SKU o nombre)..."
             value={searchProducto}
             onChange={(e) => setSearchProducto(e.target.value)}
-            className="input mov-detail-search"
+            className="form-input mov-detail-search"
           />
 
           {detalles.map((d, i) => {
@@ -334,15 +375,8 @@ export default function Despachos() {
 
             const opcionesProducto = (() => {
               const base = [...productosFiltradosBase];
-              const seleccionado = productos.find(
-                (p) => p.id === d.producto_id
-              );
-              if (
-                seleccionado &&
-                !base.some((p) => p.id === seleccionado.id)
-              ) {
-                return [seleccionado, ...base];
-              }
+              const sel = productos.find((p) => p.id === d.producto_id);
+              if (sel && !base.some((p) => p.id === sel.id)) return [sel, ...base];
               return base;
             })();
 
@@ -356,139 +390,149 @@ export default function Despachos() {
             }
 
             return (
-              <div key={i} className="mov-detail-row">
-                {/* Producto */}
-                <select
-                  value={d.producto_id}
-                  onChange={(e) => onChangeProducto(i, e.target.value)}
-                  required
-                  className="select"
-                >
-                  <option value="">Seleccione producto</option>
-                  {opcionesProducto.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.sku} - {p.nombre}
-                    </option>
-                  ))}
-                </select>
+              <div key={i} className="inline-card" style={{ marginBottom: 12 }}>
+                <div className="mov-grid-2">
+                  {/* Producto */}
+                  <div className="form-field">
+                    <label className="form-label">Producto</label>
+                    <select
+                      value={d.producto_id}
+                      onChange={(e) => onChangeProducto(i, e.target.value)}
+                      required
+                      className="form-input"
+                    >
+                      <option value="">Seleccione producto</option>
+                      {opcionesProducto.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.sku} - {p.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                {/* Tipo de precio */}
-                <select
-                  value={d.precio_tipo}
-                  onChange={(e) =>
-                    onChangePrecioTipo(i, e.target.value as PrecioTipo)
-                  }
-                  className="select"
-                >
-                  <option value="NORMAL">Venta</option>
-                  <option value="MAYORISTA">Mayorista</option>
-                  <option value="CAJA">Caja</option>
-                  <option value="DESCUENTO">Descuento</option>
-                </select>
+                  {/* Tipo precio */}
+                  <div className="form-field">
+                    <label className="form-label">Tipo</label>
+                    <select
+                      value={d.precio_tipo}
+                      onChange={(e) =>
+                        onChangePrecioTipo(i, e.target.value as PrecioTipo)
+                      }
+                      className="form-input"
+                    >
+                      <option value="NORMAL">Venta</option>
+                      <option value="MAYORISTA">Mayorista</option>
+                      <option value="CAJA">Caja</option>
+                      <option value="DESCUENTO">Descuento</option>
+                    </select>
+                  </div>
+                </div>
 
-                {/* Cantidad + equivalencias */}
-                <div className="mov-detail-extra">
-                  <input
-                    type="number"
-                    placeholder="Cantidad (unidades)"
-                    value={d.cantidad || ''}
-                    onChange={(e) =>
-                      onChangeCantidad(i, Number(e.target.value))
-                    }
-                    className="input"
-                  />
-                  {d.precio_tipo === 'CAJA' && upc > 0 && (
-                    <>
-                      <span className="mov-detail-hint">
+                {/* Cantidad / Precio / Total */}
+                <div className="mov-grid-2" style={{ marginTop: 12 }}>
+                  <div className="form-field">
+                    <label className="form-label">Cantidad (unidades)</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      value={d.cantidad || ''}
+                      onChange={(e) =>
+                        onChangeCantidad(i, Number(e.target.value))
+                      }
+                      className="form-input"
+                      min={0}
+                    />
+
+                    {d.precio_tipo === 'CAJA' && upc > 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
                         1 caja = {upc} unidades
-                      </span>
-                      {d.cantidad > 0 && (
-                        <span className="mov-detail-hint">
-                          Equivale a{' '}
-                          {cajasEq > 0 ? `${cajasEq} caja(s)` : '0 cajas'}
-                          {restoEq > 0 ? ` + ${restoEq} unidad(es)` : ''}
-                        </span>
-                      )}
-                    </>
+                        {d.cantidad > 0 && (
+                          <>
+                            <br />
+                            Equivale a {cajasEq} caja(s)
+                            {restoEq > 0 ? ` + ${restoEq} unidad(es)` : ''}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="form-field">
+                    <label className="form-label">
+                      Precio unitario ({tipoBadge(d.precio_tipo)})
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={d.precio_unitario ?? ''}
+                      onChange={(e) => {
+                        if (isReadOnlyPrice(d.precio_tipo)) return;
+                        updateDetalle(i, {
+                          precio_unitario: Number(e.target.value) || 0,
+                        });
+                      }}
+                      className="form-input"
+                      readOnly={isReadOnlyPrice(d.precio_tipo)}
+                    />
+                  </div>
+                </div>
+
+                <div className="mov-grid-2" style={{ marginTop: 12 }}>
+                  <div className="form-field">
+                    <label className="form-label">Total línea</label>
+                    <input
+                      readOnly
+                      value={totalLinea ? totalLinea.toFixed(2) : ''}
+                      placeholder="0.00"
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-field">
+                    <label className="form-label">Motivo desc. (opcional)</label>
+                    <input
+                      placeholder="Solo si usas DESCUENTO"
+                      value={d.motivo_descuento ?? ''}
+                      onChange={(e) =>
+                        updateDetalle(i, { motivo_descuento: e.target.value })
+                      }
+                      className="form-input"
+                      readOnly={d.precio_tipo !== 'DESCUENTO'}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 12, display: 'flex', gap: 10, justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
+                    Línea #{i + 1}
+                  </div>
+
+                  {detalles.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeDetalle(i)}
+                      className="btn-secondary"
+                    >
+                      Quitar línea
+                    </button>
                   )}
                 </div>
-
-                {/* Precio */}
-                <div className="mov-detail-price">
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Precio"
-                    value={d.precio_unitario ?? ''}
-                    onChange={(e) => {
-                      if (isReadOnlyPrice(d.precio_tipo)) return;
-                      updateDetalle(i, {
-                        precio_unitario: Number(e.target.value) || 0,
-                      });
-                    }}
-                    className="input"
-                    readOnly={isReadOnlyPrice(d.precio_tipo)}
-                  />
-                  <span className="btn-chip">{tipoBadge(d.precio_tipo)}</span>
-                </div>
-
-                {/* Total */}
-                <input
-                  readOnly
-                  value={totalLinea ? totalLinea.toFixed(2) : ''}
-                  placeholder="Total"
-                  className="input"
-                />
-
-                {/* Motivo descuento */}
-                <input
-                  placeholder="Motivo desc. (opcional)"
-                  value={d.motivo_descuento ?? ''}
-                  onChange={(e) =>
-                    updateDetalle(i, { motivo_descuento: e.target.value })
-                  }
-                  className="input"
-                  readOnly={d.precio_tipo !== 'DESCUENTO'}
-                />
-
-                {detalles.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeDetalle(i)}
-                    className="btn btn-icon-danger"
-                  >
-                    ✕
-                  </button>
-                )}
               </div>
             );
           })}
 
-          <button
-            type="button"
-            onClick={addDetalle}
-            className="btn btn-secondary"
-          >
+          <button type="button" onClick={addDetalle} className="btn-secondary">
             + Agregar línea
           </button>
         </div>
 
-        <button type="submit" disabled={loading} className="btn-primary">
-          {loading ? 'Guardando...' : 'Registrar despacho'}
-        </button>
-
-        {msg && (
-          <p
-            className={
-              'form-message ' +
-              (msg.includes('Error')
-                ? 'form-message-error'
-                : 'form-message-success')
-            }
-          >
-            {msg}
-          </p>
-        )}
+        {/* ACCIONES */}
+        <div className="mov-actions">
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading ? 'Guardando...' : 'Registrar despacho'}
+          </button>
+        </div>
       </form>
     </div>
   );

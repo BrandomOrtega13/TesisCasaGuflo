@@ -17,12 +17,19 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401) {
+    const url = String(err.config?.url || '');
+
+    // Si el 401 viene del login, NO cerrar sesión ni redirigir
+    const isLoginRequest = url.includes('/auth/login');
+
+    if (err.response?.status === 401 && !isLoginRequest) {
       useAuthStore.getState().logout();
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
+
     return Promise.reject(err);
   }
 );
-
 export default api;

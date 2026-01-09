@@ -4,6 +4,9 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 
+/* 👇 NUEVO */
+import Home from './pages/Home';
+
 import ProductsList from './pages/ProductsList';
 import ProductForm from './pages/ProductForm';
 import Ingresos from './pages/Ingresos';
@@ -38,14 +41,15 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<div>Bienvenido a Casa Guflo</div>} />
+        {/* 👇 CAMBIO CLAVE */}
+        <Route index element={<Home />} />
 
         {/* Inventario */}
         <Route path="productos" element={<ProductsList />} />
         <Route path="productos/:id" element={<ProductForm />} />
         <Route path="productos/:id/detalle" element={<ProductDetail />} />
 
-        {/* Categorias */}
+        {/* Categorías */}
         <Route path="categorias" element={<CategoriasList />} />
         <Route path="categorias/:id" element={<CategoriaForm />} />
 

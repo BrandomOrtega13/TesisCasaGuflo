@@ -18,7 +18,7 @@ export default function Ingresos() {
   const [proveedorId, setProveedorId] = useState('');
   const [observacion, setObservacion] = useState('');
   const [detalles, setDetalles] = useState<Detalle[]>([
-    { producto_id: '', cantidad: 0 }, // antes 1
+    { producto_id: '', cantidad: 0 },
   ]);
 
   const [loading, setLoading] = useState(false);
@@ -59,7 +59,6 @@ export default function Ingresos() {
         i === index
           ? {
               ...d,
-              // si es numérico (cantidad) lo convertimos a número, si no, lo dejamos como string
               [field]: Number.isNaN(Number(value)) ? value : Number(value),
             }
           : d
@@ -78,21 +77,22 @@ export default function Ingresos() {
     setLoading(true);
     setMsg(null);
     try {
-      // solo mandamos líneas con cantidad > 0
       const limpios = detalles.filter((d) => d.producto_id && d.cantidad > 0);
       if (!bodegaId || limpios.length === 0) {
         setMsg('Seleccione bodega y al menos un producto con cantidad > 0');
         setLoading(false);
         return;
       }
+
       await api.post('/movimientos/ingresos', {
         bodega_id: bodegaId,
         proveedor_id: proveedorId || null,
         observacion,
         detalles: limpios,
       });
+
       setMsg('Ingreso registrado correctamente');
-      setDetalles([{ producto_id: '', cantidad: 0 }]); // reset
+      setDetalles([{ producto_id: '', cantidad: 0 }]);
       setObservacion('');
     } catch (err) {
       console.error(err);
@@ -104,7 +104,6 @@ export default function Ingresos() {
 
   // ---- LISTAS FILTRADAS (manteniendo el seleccionado) ----
 
-  // bodegas
   const bodegasFiltradasBase = bodegas.filter((b) =>
     b.nombre.toLowerCase().includes(searchBodega.toLowerCase())
   );
@@ -115,7 +114,6 @@ export default function Ingresos() {
       : [selectedBodega, ...bodegasFiltradasBase]
     : bodegasFiltradasBase;
 
-  // proveedores
   const proveedoresFiltradosBase = proveedores.filter((p) =>
     p.nombre.toLowerCase().includes(searchProveedor.toLowerCase())
   );
@@ -126,163 +124,178 @@ export default function Ingresos() {
       : [selectedProveedor, ...proveedoresFiltradosBase]
     : proveedoresFiltradosBase;
 
-  // productos (filtro global por texto)
   const productosFiltradosBase = productos.filter((p) => {
     const texto = `${p.sku} ${p.nombre}`.toLowerCase();
     return texto.includes(searchProducto.toLowerCase());
   });
 
   return (
-    <div className="app-page">
-      <h2 className="page-header-title">Ingresos</h2>
+  <div className="mov-page">
+    {/* HEADER */}
+    <div className="mov-header">
+      <h2>Ingresos</h2>
+      <p>Registra entradas de inventario por bodega y proveedor.</p>
+    </div>
 
-      <form onSubmit={onSubmit} className="mov-form">
-        {/* Bodega */}
-        <div className="form-field">
-          <label className="form-label">Bodega</label>
-          <input
-            placeholder="Buscar bodega..."
-            value={searchBodega}
-            onChange={(e) => setSearchBodega(e.target.value)}
-            className="input"
-          />
-          <select
-            value={bodegaId}
-            onChange={(e) => setBodegaId(e.target.value)}
-            required
-            className="input"
-          >
-            <option value="">Seleccione bodega</option>
-            {bodegasFiltradas.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.nombre}
-              </option>
-            ))}
-          </select>
+    <form onSubmit={onSubmit} className="mov-card">
+      {/* CABECERA */}
+      <div className="mov-section">
+        <div className="mov-section-title">Cabecera</div>
+
+        <div className="mov-grid-2">
+          {/* Bodega */}
+          <div className="form-field">
+            <label className="form-label">Bodega</label>
+            <input
+              placeholder="Buscar bodega..."
+              value={searchBodega}
+              onChange={(e) => setSearchBodega(e.target.value)}
+              className="form-input"
+            />
+            <select
+              value={bodegaId}
+              onChange={(e) => setBodegaId(e.target.value)}
+              required
+              className="form-input"
+            >
+              <option value="">Seleccione bodega</option>
+              {bodegasFiltradas.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Proveedor */}
+          <div className="form-field">
+            <label className="form-label">Proveedor (opcional)</label>
+            <input
+              placeholder="Buscar proveedor..."
+              value={searchProveedor}
+              onChange={(e) => setSearchProveedor(e.target.value)}
+              className="form-input"
+            />
+            <select
+              value={proveedorId}
+              onChange={(e) => setProveedorId(e.target.value)}
+              className="form-input"
+            >
+              <option value="">Sin proveedor</option>
+              {proveedoresFiltrados.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Proveedor */}
-        <div className="form-field">
-          <label className="form-label">Proveedor (opcional)</label>
-          <input
-            placeholder="Buscar proveedor..."
-            value={searchProveedor}
-            onChange={(e) => setSearchProveedor(e.target.value)}
-            className="input"
-          />
-          <select
-            value={proveedorId}
-            onChange={(e) => setProveedorId(e.target.value)}
-            className="input"
-          >
-            <option value="">Sin proveedor</option>
-            {proveedoresFiltrados.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.nombre}
-              </option>
-            ))}
-          </select>
+        <div className="mov-grid-1">
+          <div className="form-field">
+            <label className="form-label">Observación</label>
+            <input
+              value={observacion}
+              onChange={(e) => setObservacion(e.target.value)}
+              className="form-input"
+              placeholder="Ej: ingreso por compra, reposición..."
+            />
+          </div>
         </div>
+      </div>
 
-        {/* Observación */}
-        <div className="form-field">
-          <label className="form-label">Observación</label>
-          <input
-            value={observacion}
-            onChange={(e) => setObservacion(e.target.value)}
-            className="input"
-          />
-        </div>
+      {/* DETALLE */}
+      <div className="mov-section">
+        <div className="mov-section-title">Detalle</div>
 
-        {/* Detalle */}
-        <div className="form-field">
-          <label className="form-label">Detalle</label>
+        <input
+          placeholder="Buscar producto (SKU o nombre)..."
+          value={searchProducto}
+          onChange={(e) => setSearchProducto(e.target.value)}
+          className="form-input mov-detail-search"
+        />
 
-          <input
-            placeholder="Buscar producto (SKU o nombre)..."
-            value={searchProducto}
-            onChange={(e) => setSearchProducto(e.target.value)}
-            className="input mov-detail-search"
-          />
+        {detalles.map((d, i) => {
+          const opciones = (() => {
+            const base = [...productosFiltradosBase];
+            const sel = productos.find((p) => p.id === d.producto_id);
+            if (sel && !base.some((p) => p.id === sel.id)) {
+              return [sel, ...base];
+            }
+            return base;
+          })();
 
-          {detalles.map((d, i) => {
-            // asegurar que el producto seleccionado esté en la lista filtrada
-            const opciones = (() => {
-              const base = [...productosFiltradosBase];
-              const seleccionado = productos.find((p) => p.id === d.producto_id);
-              if (seleccionado && !base.some((p) => p.id === seleccionado.id)) {
-                return [seleccionado, ...base];
-              }
-              return base;
-            })();
+          return (
+            <div key={i} className="mov-detail-row">
+              <select
+                value={d.producto_id}
+                onChange={(e) =>
+                  updateDetalle(i, 'producto_id', e.target.value)
+                }
+                required
+                className="form-input"
+              >
+                <option value="">Seleccione producto</option>
+                {opciones.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.sku} - {p.nombre}
+                  </option>
+                ))}
+              </select>
 
-            return (
-              <div key={i} className="mov-detail-row">
-                <select
-                  value={d.producto_id}
-                  onChange={(e) =>
-                    updateDetalle(i, 'producto_id', e.target.value)
-                  }
-                  required
-                  className="input"
+              <input
+                type="number"
+                placeholder="Cantidad"
+                value={d.cantidad || ''}
+                onChange={(e) =>
+                  updateDetalle(i, 'cantidad', e.target.value)
+                }
+                className="form-input"
+              />
+
+              {detalles.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeDetalle(i)}
+                  className="btn-icon-danger"
                 >
-                  <option value="">Seleccione producto</option>
-                  {opciones.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.sku} - {p.nombre}
-                    </option>
-                  ))}
-                </select>
+                  ✕
+                </button>
+              )}
+            </div>
+          );
+        })}
 
-                <input
-                  type="number"
-                  placeholder="Cantidad (unidades)"
-                  value={d.cantidad || ''} // 0 se muestra como vacío
-                  onChange={(e) =>
-                    updateDetalle(i, 'cantidad', e.target.value)
-                  }
-                  className="input"
-                />
+        <button
+          type="button"
+          onClick={addDetalle}
+          className="btn-secondary"
+        >
+          + Agregar línea
+        </button>
+      </div>
 
-                {detalles.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeDetalle(i)}
-                    className="btn-icon-danger"
-                  >
-                    ✕
-                  </button>
-                )}
-              </div>
-            );
-          })}
-
-          <button
-            type="button"
-            onClick={addDetalle}
-            className="btn-secondary"
-          >
-            + Agregar línea
-          </button>
-        </div>
-
+      {/* ACCIONES */}
+      <div className="mov-actions">
         <button type="submit" disabled={loading} className="btn-primary">
           {loading ? 'Guardando...' : 'Registrar ingreso'}
         </button>
+      </div>
 
-        {msg && (
-          <p
-            className={
-              'form-message ' +
-              (msg.includes('Error')
-                ? 'form-message-error'
-                : 'form-message-success')
-            }
-          >
-            {msg}
-          </p>
-        )}
-      </form>
-    </div>
-  );
+      {msg && (
+        <p
+          className={
+            'form-message ' +
+            (msg.includes('Error')
+              ? 'form-message-error'
+              : 'form-message-success')
+          }
+        >
+          {msg}
+        </p>
+      )}
+    </form>
+  </div>
+);
+
 }

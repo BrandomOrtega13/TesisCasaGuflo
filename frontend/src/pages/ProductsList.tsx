@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import ProductDetailModal from '../components/ProductDetailModal';
+import ProductFormModal from '../components/ProductFormModal';
 
 type Producto = {
   id: string;
@@ -25,7 +26,40 @@ export default function ProductsList() {
   const [msg, setMsg] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
-  const navigate = useNavigate();
+
+
+  // === modal detalle ===
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
+
+  const openDetail = (id: string) => {
+    setDetailId(id);
+    setDetailOpen(true);
+  };
+
+  const closeDetail = () => {
+    setDetailOpen(false);
+    setDetailId(null);
+  };
+
+  // === modal form (nuevo / editar) ===
+  const [formOpen, setFormOpen] = useState(false);
+  const [formId, setFormId] = useState<string | null>(null); // null => nuevo
+
+  const openNew = () => {
+    setFormId(null);
+    setFormOpen(true);
+  };
+
+  const openEdit = (id: string) => {
+    setFormId(id);
+    setFormOpen(true);
+  };
+
+  const closeForm = () => {
+    setFormOpen(false);
+    setFormId(null);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -131,167 +165,191 @@ export default function ProductsList() {
   };
 
   const isStockBajo = (stock: number) => {
-    // REGLA: alerta cuando stock <= 24 unidades
     return stock > 0 && stock <= 24;
   };
 
   return (
-    <div>
-      {/* Cabecera de página */}
-      <div className="page-header">
-        <h2 className="page-header-title">Productos</h2>
-
-        <div className="page-header-actions">
-          <input
-            placeholder="Buscar por SKU, nombre o categoría..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="search-input"
-          />
-
-          <div className="segmented">
-            <button
-              type="button"
-              onClick={() => setShowInactive(false)}
-              className={
-                'segmented-button ' +
-                (!showInactive ? 'segmented-button--active' : '')
-              }
-            >
-              Activos
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowInactive(true)}
-              className={
-                'segmented-button ' +
-                (showInactive ? 'segmented-button--active' : '')
-              }
-            >
-              Inactivos
-            </button>
+    <div className="page">
+      {/* Header en card */}
+      <div className="card page-head-card">
+        <div className="page-header">
+          <div>
+            <h2 className="page-header-title">Productos</h2>
+            <div className="page-subtitle">
+              Administra tu inventario: crea, edita, desactiva y revisa stock.
+            </div>
           </div>
 
-          {!showInactive && (
-            <button
-              type="button"
-              onClick={() => navigate('/productos/nuevo')}
-              className="btn-primary"
-            >
-              + Nuevo producto
-            </button>
-          )}
+          <div className="page-header-actions">
+            <input
+              placeholder="Buscar por SKU, nombre o categoría..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="search-input"
+            />
+
+            <div className="segmented">
+              <button
+                type="button"
+                onClick={() => setShowInactive(false)}
+                className={
+                  'segmented-button ' +
+                  (!showInactive ? 'segmented-button--active' : '')
+                }
+              >
+                Activos
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowInactive(true)}
+                className={
+                  'segmented-button ' +
+                  (showInactive ? 'segmented-button--active' : '')
+                }
+              >
+                Inactivos
+              </button>
+            </div>
+
+            {!showInactive && (
+              <button
+                type="button"
+                onClick={openNew}
+                className="btn-primary"
+              >
+                + Nuevo producto
+              </button>
+            )}
+          </div>
+        </div>
+
+        {loading && <p className="list-message">Cargando...</p>}
+        {msg && (
+          <p
+            className={
+              'list-message ' +
+              (msg.includes('Error')
+                ? 'list-message-error'
+                : 'list-message-success')
+            }
+          >
+            {msg}
+          </p>
+        )}
+      </div>
+
+      {/* Tabla en card */}
+      <div className="card table-card">
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th className="table-header-cell">SKU</th>
+                <th className="table-header-cell">Nombre</th>
+                <th className="table-header-cell">Categoría</th>
+                <th className="table-header-cell">Stock</th>
+                <th className="table-header-cell">UDS/CAJA</th>
+                <th className="table-header-cell">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((p) => {
+                const stock = getStock(p);
+                const udsCaja = getUdsCaja(p);
+                const stockBajo = isStockBajo(stock);
+
+                const rowClass =
+                  'table-row' + (stockBajo ? ' stock-low-row' : '');
+
+                return (
+                  <tr key={p.id} className={rowClass}>
+                    <td className="table-cell">{p.sku}</td>
+                    <td className="table-cell">{p.nombre}</td>
+                    <td className="table-cell">{p.categoria || '—'}</td>
+                    <td className="table-cell">
+                      {stock}
+                      {stockBajo && (
+                        <span className="stock-low-badge">Stock bajo</span>
+                      )}
+                    </td>
+                    <td className="table-cell">{udsCaja ?? '—'}</td>
+                    <td className="table-cell">
+                      <button
+                        type="button"
+                        onClick={() => openDetail(p.id)}
+                        className="link-btn"
+                      >
+                        Ver detalles
+                      </button>
+
+                      {!showInactive ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openEdit(p.id)}
+                            className="link-btn"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onDeactivate(p.id)}
+                            className="link-btn link-btn-danger"
+                          >
+                            Desactivar
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => onReactivate(p.id)}
+                            className="link-btn"
+                          >
+                            Reactivar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onHardDelete(p.id)}
+                            className="link-btn link-btn-danger"
+                          >
+                            Eliminar
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="table-cell table-cell-empty">
+                    {showInactive
+                      ? 'No hay productos inactivos.'
+                      : 'No hay productos registrados.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {loading && <p className="list-message">Cargando...</p>}
-      {msg && (
-        <p
-          className={
-            'list-message ' +
-            (msg.includes('Error')
-              ? 'list-message-error'
-              : 'list-message-success')
-          }
-        >
-          {msg}
-        </p>
-      )}
+      {/* MODAL DETALLE */}
+      <ProductDetailModal
+        open={detailOpen}
+        productId={detailId}
+        onClose={closeDetail}
+      />
 
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th className="table-header-cell">SKU</th>
-              <th className="table-header-cell">Nombre</th>
-              <th className="table-header-cell">Categoría</th>
-              <th className="table-header-cell">Stock</th>
-              <th className="table-header-cell">UDS/CAJA</th>
-              <th className="table-header-cell">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((p) => {
-              const stock = getStock(p);
-              const udsCaja = getUdsCaja(p);
-              const stockBajo = isStockBajo(stock);
-
-              const rowClass =
-                'table-row' + (stockBajo ? ' stock-low-row' : '');
-
-              return (
-                <tr key={p.id} className={rowClass}>
-                  <td className="table-cell">{p.sku}</td>
-                  <td className="table-cell">{p.nombre}</td>
-                  <td className="table-cell">{p.categoria || '—'}</td>
-                  <td className="table-cell">
-                    {stock}
-                    {stockBajo && (
-                      <span className="stock-low-badge">Stock bajo</span>
-                    )}
-                  </td>
-                  <td className="table-cell">{udsCaja ?? '—'}</td>
-                  <td className="table-cell">
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/productos/${p.id}/detalle`)}
-                      className="link-btn"
-                    >
-                      Ver detalles
-                    </button>
-                    {!showInactive && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/productos/${p.id}`)}
-                          className="link-btn"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => onDeactivate(p.id)}
-                          className="link-btn link-btn-danger"
-                        >
-                          Desactivar
-                        </button>
-                      </>
-                    )}
-                    {showInactive && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => onReactivate(p.id)}
-                          className="link-btn"
-                        >
-                          Reactivar
-                        </button>
-                          <button
-                          type="button"
-                          onClick={() => onHardDelete(p.id)}
-                          className="link-btn link-btn-danger"
-                        >
-                          Eliminar
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={6} className="table-cell table-cell-empty">
-                  {showInactive
-                    ? 'No hay productos inactivos.'
-                    : 'No hay productos registrados.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {/* MODAL NUEVO / EDITAR */}
+      <ProductFormModal
+        open={formOpen}
+        productId={formId}
+        onClose={closeForm}
+        onSaved={load}
+      />
     </div>
   );
 }

@@ -29,7 +29,6 @@ export default function ProductForm() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [msg, setMsg] = useState<string | null>(null);
 
-  // Cargar categorías para desplegable
   useEffect(() => {
     const loadCategorias = async () => {
       try {
@@ -43,7 +42,6 @@ export default function ProductForm() {
     loadCategorias();
   }, []);
 
-  // Si es edición, cargar producto
   useEffect(() => {
     const load = async () => {
       if (!isNew && id) {
@@ -100,11 +98,12 @@ export default function ProductForm() {
 
   return (
     <div className="form-page">
-      <div className="card">
+      {/* CAMBIO: usa form-card (se ve más pro y centrado) */}
+      <div className="form-card">
         <button
           type="button"
           className="btn-link-back"
-          onClick={() => navigate('/productos')}
+          onClick={() => navigate(-1)} // CAMBIO: vuelve a la pantalla anterior
         >
           ← Volver
         </button>
@@ -126,24 +125,21 @@ export default function ProductForm() {
         <form onSubmit={handleSubmit(onSubmit)} className="form-grid">
           <div className="form-field">
             <label className="form-label">SKU *</label>
-            <input
-              className="form-input"
-              {...register('sku', { required: true })}
-            />
+            {/* CAMBIO: form-input -> input */}
+            <input className="input" {...register('sku', { required: true })} />
           </div>
 
           <div className="form-field">
             <label className="form-label">Nombre *</label>
-            <input
-              className="form-input"
-              {...register('nombre', { required: true })}
-            />
+            {/* CAMBIO: form-input -> input */}
+            <input className="input" {...register('nombre', { required: true })} />
           </div>
 
           <div className="form-field">
             <label className="form-label">Categoría (opcional)</label>
+            {/* CAMBIO: form-input -> select */}
             <select
-              className="form-input"
+              className="select"
               {...register('categoria_id')}
               onChange={(e) => setValue('categoria_id', e.target.value)}
             >
@@ -156,58 +152,38 @@ export default function ProductForm() {
             </select>
           </div>
 
-          <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-field">
               <label className="form-label">Precio compra</label>
-              <input
-                type="number"
-                step="0.01"
-                className="form-input"
-                {...register('precio_compra')}
-              />
+              {/* CAMBIO: form-input -> input */}
+              <input type="number" step="0.01" className="input" {...register('precio_compra')} />
             </div>
 
             <div className="form-field">
               <label className="form-label">Precio unitario</label>
-              <input
-                type="number"
-                step="0.01"
-                className="form-input"
-                {...register('precio_venta')}
-              />
+              {/* CAMBIO: form-input -> input */}
+              <input type="number" step="0.01" className="input" {...register('precio_venta')} />
             </div>
           </div>
 
-          <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+          <div className="form-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div className="form-field">
               <label className="form-label">Precio mayorista</label>
-              <input
-                type="number"
-                step="0.01"
-                className="form-input"
-                {...register('precio_mayorista')}
-              />
+              {/* CAMBIO: form-input -> input */}
+              <input type="number" step="0.01" className="input" {...register('precio_mayorista')} />
             </div>
 
             <div className="form-field">
               <label className="form-label">Precio por caja</label>
-              <input
-                type="number"
-                step="0.01"
-                className="form-input"
-                {...register('precio_caja')}
-              />
+              {/* CAMBIO: form-input -> input */}
+              <input type="number" step="0.01" className="input" {...register('precio_caja')} />
             </div>
           </div>
 
           <div className="form-field">
             <label className="form-label">Unidades por caja</label>
-            <input
-              type="number"
-              min={1}
-              className="form-input"
-              {...register('unidades_por_caja')}
-            />
+            {/* CAMBIO: form-input -> input */}
+            <input type="number" min={1} className="input" {...register('unidades_por_caja')} />
           </div>
 
           <button type="submit" className="btn-primary">
