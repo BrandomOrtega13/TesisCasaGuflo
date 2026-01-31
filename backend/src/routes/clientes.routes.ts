@@ -7,6 +7,106 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// ======================
+// Helpers
+// ======================
+const onlyDigits = (s: any) => String(s ?? '').replace(/\D/g, '').trim();
+
+const isValidEmailFormat = (email: string) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
+/**
+ * Valida cédula ecuatoriana (10 dígitos)
+ * - provincia: 01..24
+ * - tercer dígito: 0..5 (persona natural)
+ * - dígito verificador (módulo 10)
+ */
+const isValidEcuadorCedula = (cedula: string): boolean => {
+  if (!/^\d{10}$/.test(cedula)) return false;
+
+  const prov = Number(cedula.slice(0, 2));
+  if (prov < 1 || prov > 24) return false;
+
+  const third = Number(cedula[2]);
+  if (third < 0 || third > 5) return false;
+
+  const digits = cedula.split('').map((c) => Number(c));
+  const check = digits[9];
+
+  let sum = 0;
+  for (let i = 0; i < 9; i++) {
+    let val = digits[i];
+    if (i % 2 === 0) {
+      val = val * 2;
+      if (val > 9) val -= 9;
+    }
+    sum += val;
+  }
+  const mod = sum % 10;
+  const verifier = mod === 0 ? 0 : 10 - mod;
+
+  return verifier === check;
+};
+
+/**
+ * Validación básica RUC persona natural (13 dígitos):
+ * - primeros 10 deben ser cédula válida
+ * - últimos 3 no pueden ser "000"
+ */
+const isValidEcuadorRucNatural = (ruc: string): boolean => {
+  if (!/^\d{13}$/.test(ruc)) return false;
+  const baseCedula = ruc.slice(0, 10);
+  const suffix = ruc.slice(10);
+  if (!isValidEcuadorCedula(baseCedula)) return false;
+  if (suffix === '000') return false;
+  return true;
+};
+
+/**
+ * Normaliza y valida identificación:
+ * - SOLO permite 10 (cédula) o 13 (ruc)
+ * - 10 => cédula válida
+ * - 13 => ruc válido (natural básico)
+ */
+const normalizeAndValidateIdent = (identificacion: any) => {
+  const identDigits = onlyDigits(identificacion);
+
+  if (!identDigits) {
+    return { ok: false, ident: identDigits, message: 'La identificación es obligatoria' };
+  }
+
+  if (identDigits.length !== 10 && identDigits.length !== 13) {
+    return {
+      ok: false,
+      ident: identDigits,
+      message: 'La identificación debe ser una cédula (10 dígitos) o un RUC (13 dígitos)',
+    };
+  }
+
+  if (identDigits.length === 10) {
+    if (!isValidEcuadorCedula(identDigits)) {
+      return {
+        ok: false,
+        ident: identDigits,
+        message: 'La cédula ingresada no es válida (revise los dígitos)',
+      };
+    }
+  }
+
+  if (identDigits.length === 13) {
+    if (!isValidEcuadorRucNatural(identDigits)) {
+      return {
+        ok: false,
+        ident: identDigits,
+        message: 'El RUC ingresado no es válido (revise los dígitos)',
+      };
+    }
+  }
+
+  return { ok: true, ident: identDigits, message: '' };
+};
+
 /**
  * GET /clientes
  * Solo activos (para selects y lista principal)
@@ -73,16 +173,40 @@ router.post('/', async (req, res) => {
   try {
     const { identificacion, nombre, telefono, correo } = req.body;
 
-    if (!nombre) {
+    const identCheck = normalizeAndValidateIdent(identificacion);
+    if (!identCheck.ok) {
+      return res.status(400).json({ message: identCheck.message });
+    }
+
+    if (!nombre || !String(nombre).trim()) {
       return res.status(400).json({ message: 'El nombre es obligatorio' });
+    }
+
+    // No permitir identificaciones duplicadas
+    const exists = await pool.query(
+      `SELECT id FROM clientes WHERE identificacion = $1 LIMIT 1`,
+      [identCheck.ident]
+    );
+    if (exists.rowCount && exists.rowCount > 0) {
+      return res.status(400).json({ message: 'Ya existe un cliente con esa identificación' });
+    }
+
+    const telefonoDigits = onlyDigits(telefono);
+    const correoClean = String(correo ?? '').trim();
+
+    if (correoClean) {
+      if (!isValidEmailFormat(correoClean)) {
+        return res.status(400).json({ message: 'El correo no tiene un formato válido' });
+      }
     }
 
     const r = await pool.query(
       `INSERT INTO clientes (identificacion, nombre, telefono, correo, activo)
        VALUES ($1,$2,$3,$4, TRUE)
        RETURNING id, nombre`,
-      [identificacion || null, nombre, telefono || null, correo || null]
+      [identCheck.ident, String(nombre).trim(), telefonoDigits || null, correoClean || null]
     );
+
     res.status(201).json(r.rows[0]);
   } catch (err: any) {
     console.error('Error en POST /clientes:', err.message || err);
@@ -98,6 +222,37 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { identificacion, nombre, telefono, correo, activo } = req.body;
 
+    const ident =
+      identificacion === undefined ? undefined : normalizeAndValidateIdent(identificacion);
+
+    if (ident !== undefined && !ident.ok) {
+      return res.status(400).json({ message: ident.message });
+    }
+
+    if (ident !== undefined) {
+      // No permitir duplicados en update (distinto id)
+      const exists = await pool.query(
+        `SELECT id FROM clientes WHERE identificacion = $1 AND id <> $2 LIMIT 1`,
+        [ident.ident, id]
+      );
+      if (exists.rowCount && exists.rowCount > 0) {
+        return res.status(400).json({ message: 'Ya existe un cliente con esa identificación' });
+      }
+    }
+
+    if (nombre !== undefined && !String(nombre).trim()) {
+      return res.status(400).json({ message: 'El nombre no puede estar vacío' });
+    }
+
+    const telefonoDigits = telefono === undefined ? undefined : onlyDigits(telefono);
+    const correoClean = correo === undefined ? undefined : String(correo ?? '').trim();
+
+    if (correoClean !== undefined && correoClean) {
+      if (!isValidEmailFormat(correoClean)) {
+        return res.status(400).json({ message: 'El correo no tiene un formato válido' });
+      }
+    }
+
     const r = await pool.query(
       `UPDATE clientes
        SET
@@ -109,10 +264,10 @@ router.put('/:id', async (req, res) => {
        WHERE id = $6
        RETURNING id, nombre`,
       [
-        identificacion ?? null,
-        nombre ?? null,
-        telefono ?? null,
-        correo ?? null,
+        ident !== undefined ? ident.ident : null,
+        nombre !== undefined ? String(nombre).trim() : null,
+        telefonoDigits !== undefined ? (telefonoDigits || null) : null,
+        correoClean !== undefined ? (correoClean || null) : null,
         typeof activo === 'boolean' ? activo : null,
         id,
       ]
@@ -121,6 +276,7 @@ router.put('/:id', async (req, res) => {
     if (r.rowCount === 0) {
       return res.status(404).json({ message: 'Cliente no encontrado' });
     }
+
     res.json(r.rows[0]);
   } catch (err: any) {
     console.error('Error en PUT /clientes/:id:', err.message || err);
@@ -131,7 +287,6 @@ router.put('/:id', async (req, res) => {
 /**
  * DELETE /clientes/:id
  * Baja lógica: activo = FALSE
- * (así no rompemos los movimientos ya registrados)
  */
 router.delete('/:id', async (req, res) => {
   try {
@@ -213,6 +368,5 @@ router.delete('/:id/hard', async (req, res) => {
     client.release();
   }
 });
-
 
 export default router;

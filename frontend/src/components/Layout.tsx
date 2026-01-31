@@ -1,6 +1,7 @@
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useMemo, useState } from 'react';
+import logo from '../assets/logo.svg';
 
 function Icon({
   name,
@@ -17,11 +18,11 @@ function Icon({
     | 'home'
     | 'pin'
     | 'pinOff'
-    | 'power';
+    | 'power'
+    | 'menu'
+    | 'close';
   className?: string;
 }) {
-  // SVG inline para NO instalar librerías.
-  // Todos usan currentColor => toman el color del CSS (azul que ya vienes usando).
   const svg = useMemo(() => {
     switch (name) {
       case 'box':
@@ -49,21 +50,20 @@ function Icon({
       case 'home':
         return <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-9.5Z" />;
       case 'pin':
-        return (
-          <path d="M14 2 10 6v5L8 13v2h8v-2l-2-2V6l4-4-4 0ZM12 15v7" />
-        );
+        return <path d="M14 2 10 6v5L8 13v2h8v-2l-2-2V6l4-4-4 0ZM12 15v7" />;
       case 'pinOff':
-        return (
-          <path d="M2 2l20 20M14 2 10 6v5l-2 2v2h8v-2l-2-2V6l4-4-4 0ZM12 15v7" />
-        );
+        return <path d="M2 2l20 20M14 2 10 6v5l-2 2v2h8v-2l-2-2V6l4-4-4 0ZM12 15v7" />;
       case 'power':
         return <path d="M12 2v10M6.2 4.2a10 10 0 1 0 11.6 0" />;
+      case 'menu':
+        return <path d="M4 6h16M4 12h16M4 18h16" />;
+      case 'close':
+        return <path d="M18 6 6 18M6 6l12 12" />;
       default:
         return null;
     }
   }, [name]);
 
-  // stroke icons para flechas/chart/truck/users/home/pin/power y fill para box/tag
   const isStroke =
     name === 'arrowDown' ||
     name === 'arrowUp' ||
@@ -73,7 +73,9 @@ function Icon({
     name === 'home' ||
     name === 'pin' ||
     name === 'pinOff' ||
-    name === 'power';
+    name === 'power' ||
+    name === 'menu' ||
+    name === 'close';
 
   return (
     <svg
@@ -98,17 +100,17 @@ export default function Layout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
 
-  // Estado: colapsado (cerrado) y fijado (pin)
   const [collapsed, setCollapsed] = useState(true);
   const [pinned, setPinned] = useState(false);
+
+  // ✅ SOLO para móvil/tablet: drawer abierto/cerrado
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  // Pin: cuando está pinned => sidebar abierto.
-  // Cuando lo desfijas => vuelve a colapsarse.
   const togglePinned = () => {
     setPinned((prev) => {
       const next = !prev;
@@ -125,23 +127,42 @@ export default function Layout() {
     if (!pinned) setCollapsed(true);
   };
 
+  const closeMobile = () => setMobileOpen(false);
+
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `sidebar-link ${isActive ? 'active' : ''}`;
 
   return (
-    <div className={`app-shell ${collapsed ? 'is-collapsed' : ''}`}>
+    <div
+      className={`app-shell ${collapsed ? 'is-collapsed' : ''} ${
+        mobileOpen ? 'is-mobile-open' : ''
+      }`}
+    >
+      {/* Overlay móvil */}
+      <button
+        type="button"
+        className="sidebar-overlay"
+        aria-label="Cerrar menú"
+        onClick={closeMobile}
+      />
+
       <aside
         className="sidebar"
         onMouseEnter={onSidebarEnter}
         onMouseLeave={onSidebarLeave}
       >
-        {/* Top: Brand + PIN (solo cuando está abierto) */}
         <div className="sidebar-top">
-          <Link to="/" className="sidebar-brand">
-            {collapsed ? 'CG' : 'Casa Guflo'}
+          <Link
+            to="/"
+            className="sidebar-brand"
+            onClick={() => {
+              if (mobileOpen) closeMobile();
+            }}
+          >
+            <img src={logo} alt="Casa Guflo" className="sidebar-brand-logo" />
           </Link>
 
-          {/* ✅ Esto evita el “descuadre”: NO renderiza el botón cuando está colapsado */}
+          {/* Desktop: pin (solo cuando está abierto) */}
           {!collapsed && (
             <button
               type="button"
@@ -156,56 +177,56 @@ export default function Layout() {
         </div>
 
         <nav className="sidebar-nav">
-          <NavLink to="/productos" className={linkClass}>
+          <NavLink to="/productos" className={linkClass} onClick={closeMobile}>
             <span className="icon">
               <Icon name="box" />
             </span>
             <span className="label">Productos</span>
           </NavLink>
 
-          <NavLink to="/categorias" className={linkClass}>
+          <NavLink to="/categorias" className={linkClass} onClick={closeMobile}>
             <span className="icon">
               <Icon name="tag" />
             </span>
             <span className="label">Categorías</span>
           </NavLink>
 
-          <NavLink to="/ingresos" className={linkClass}>
+          <NavLink to="/ingresos" className={linkClass} onClick={closeMobile}>
             <span className="icon">
               <Icon name="arrowDown" />
             </span>
             <span className="label">Ingresos</span>
           </NavLink>
 
-          <NavLink to="/despachos" className={linkClass}>
+          <NavLink to="/despachos" className={linkClass} onClick={closeMobile}>
             <span className="icon">
               <Icon name="arrowUp" />
             </span>
             <span className="label">Despachos</span>
           </NavLink>
 
-          <NavLink to="/movimientos" className={linkClass}>
+          <NavLink to="/movimientos" className={linkClass} onClick={closeMobile}>
             <span className="icon">
               <Icon name="chart" />
             </span>
             <span className="label">Movimientos</span>
           </NavLink>
 
-          <NavLink to="/proveedores" className={linkClass}>
+          <NavLink to="/proveedores" className={linkClass} onClick={closeMobile}>
             <span className="icon">
               <Icon name="truck" />
             </span>
             <span className="label">Proveedores</span>
           </NavLink>
 
-          <NavLink to="/clientes" className={linkClass}>
+          <NavLink to="/clientes" className={linkClass} onClick={closeMobile}>
             <span className="icon">
               <Icon name="users" />
             </span>
             <span className="label">Clientes</span>
           </NavLink>
 
-          <NavLink to="/bodegas" className={linkClass}>
+          <NavLink to="/bodegas" className={linkClass} onClick={closeMobile}>
             <span className="icon">
               <Icon name="home" />
             </span>
@@ -231,9 +252,18 @@ export default function Layout() {
         </div>
       </aside>
 
-      {/* Content */}
       <div className="content">
         <header className="topbar">
+          {/* ✅ Botón móvil (drawer) */}
+          <button
+            type="button"
+            className="topbar-menu"
+            aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
+            onClick={() => setMobileOpen((v) => !v)}
+          >
+            <Icon name={mobileOpen ? 'close' : 'menu'} />
+          </button>
+
           <div className="topbar-title">Panel</div>
           {user && <div className="topbar-user">{user.nombre} · {user.rol}</div>}
         </header>

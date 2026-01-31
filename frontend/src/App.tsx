@@ -1,12 +1,8 @@
-// src/App.tsx
 import { Route, Routes } from 'react-router-dom';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Login from './pages/Login';
-
-/* 👇 NUEVO */
 import Home from './pages/Home';
-
 import ProductsList from './pages/ProductsList';
 import ProductForm from './pages/ProductForm';
 import Ingresos from './pages/Ingresos';
@@ -15,9 +11,7 @@ import Movimientos from './pages/Movimientos';
 import ProveedoresList from './pages/ProveedoresList';
 import ProveedorForm from './pages/ProveedorForm';
 import ClientesList from './pages/ClientesList';
-import ClienteForm from './pages/ClienteForm';
 import BodegasList from './pages/BodegasList';
-import BodegaForm from './pages/BodegaForm';
 import ProductDetail from './pages/ProductDetail';
 import CategoriasList from './pages/CategoriasList';
 import CategoriaForm from './pages/CategoriaForm';
@@ -41,7 +35,6 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        {/* 👇 CAMBIO CLAVE */}
         <Route index element={<Home />} />
 
         {/* Inventario */}
@@ -62,13 +55,11 @@ export default function App() {
         <Route path="proveedores" element={<ProveedoresList />} />
         <Route path="proveedores/:id" element={<ProveedorForm />} />
 
-        {/* Clientes */}
+        {/* Clientes (solo lista, el form es modal) */}
         <Route path="clientes" element={<ClientesList />} />
-        <Route path="clientes/:id" element={<ClienteForm />} />
 
-        {/* Bodegas */}
+        {/* Bodegas (solo lista, el form es modal) */}
         <Route path="bodegas" element={<BodegasList />} />
-        <Route path="bodegas/:id" element={<BodegaForm />} />
 
         {/* 404 dentro del layout */}
         <Route path="*" element={<NotFound />} />

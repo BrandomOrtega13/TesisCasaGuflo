@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import BodegaFormModal from '../components/BodegaFormModal';
 
 type Bodega = {
   id: string;
@@ -16,7 +16,22 @@ export default function BodegasList() {
   const [msg, setMsg] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
-  const navigate = useNavigate();
+  // modal
+  const [formOpen, setFormOpen] = useState(false);
+  const [formId, setFormId] = useState<string | null>(null);
+
+  const openNew = () => {
+    setFormId(null);
+    setFormOpen(true);
+  };
+  const openEdit = (id: string) => {
+    setFormId(id);
+    setFormOpen(true);
+  };
+  const closeForm = () => {
+    setFormOpen(false);
+    setFormId(null);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -68,6 +83,7 @@ export default function BodegasList() {
       )
     )
       return;
+
     try {
       await api.delete(`/bodegas/${id}/hard`);
       load();
@@ -99,124 +115,137 @@ export default function BodegasList() {
       : 'list-message';
 
   return (
-    <div>
-      <div className="page-header">
-        <h2 className="page-header-title">Bodegas</h2>
-        <div className="page-header-actions">
-          <input
-            type="text"
-            placeholder="Buscar por nombre o dirección..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            className="search-input"
-          />
-
-          <div className="segmented">
-            <button
-              type="button"
-              onClick={() => setShowInactive(false)}
-              className={
-                !showInactive
-                  ? 'segmented-button segmented-button--active'
-                  : 'segmented-button'
-              }
-            >
-              Activas
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowInactive(true)}
-              className={
-                showInactive
-                  ? 'segmented-button segmented-button--active'
-                  : 'segmented-button'
-              }
-            >
-              Inactivas
-            </button>
+    <div className="page">
+      <div className="card page-head-card">
+        <div className="page-header">
+          <div>
+            <h2 className="page-header-title">Bodegas</h2>
+            <div className="page-subtitle">
+              Administra tus bodegas: crea, edita, desactiva y reactiva.
+            </div>
           </div>
 
-          {!showInactive && (
-            <button
-              type="button"
-              onClick={() => navigate('/bodegas/nuevo')}
-              className="btn-primary"
-            >
-              + Nueva bodega
-            </button>
-          )}
+          <div className="page-header-actions">
+            <input
+              type="text"
+              placeholder="Buscar por nombre o dirección..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="search-input"
+            />
+
+            <div className="segmented">
+              <button
+                type="button"
+                onClick={() => setShowInactive(false)}
+                className={
+                  !showInactive
+                    ? 'segmented-button segmented-button--active'
+                    : 'segmented-button'
+                }
+              >
+                Activas
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowInactive(true)}
+                className={
+                  showInactive
+                    ? 'segmented-button segmented-button--active'
+                    : 'segmented-button'
+                }
+              >
+                Inactivas
+              </button>
+            </div>
+
+            {!showInactive && (
+              <button type="button" onClick={openNew} className="btn-primary">
+                + Nueva bodega
+              </button>
+            )}
+          </div>
+        </div>
+
+        {loading && <p className="list-message">Cargando...</p>}
+        {msg && <p className={msgClass}>{msg}</p>}
+      </div>
+
+      <div className="card table-card">
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th className="table-header-cell">Nombre</th>
+                <th className="table-header-cell">Dirección</th>
+                <th className="table-header-cell">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((b) => (
+                <tr key={b.id} className="table-row">
+                  <td className="table-cell">{b.nombre}</td>
+                  <td className="table-cell">{b.direccion || '—'}</td>
+                  <td className="table-cell">
+                    {!showInactive ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(b.id)}
+                          className="link-btn"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDelete(b.id)}
+                          className="link-btn link-btn-danger"
+                        >
+                          Desactivar
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onReactivate(b.id)}
+                          className="link-btn"
+                        >
+                          Reactivar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onHardDelete(b.id)}
+                          className="link-btn link-btn-danger"
+                        >
+                          Eliminar
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+
+              {filtered.length === 0 && (
+                <tr>
+                  <td className="table-cell-empty" colSpan={3}>
+                    {showInactive
+                      ? 'No hay bodegas inactivas que coincidan con la búsqueda.'
+                      : 'No hay bodegas registradas que coincidan con la búsqueda.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {loading && <p className="list-message">Cargando...</p>}
-      {msg && <p className={msgClass}>{msg}</p>}
-
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th className="table-header-cell">Nombre</th>
-              <th className="table-header-cell">Dirección</th>
-              <th className="table-header-cell">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((b) => (
-              <tr key={b.id} className="table-row">
-                <td className="table-cell">{b.nombre}</td>
-                <td className="table-cell">{b.direccion || '—'}</td>
-                <td className="table-cell">
-                  {!showInactive ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/bodegas/${b.id}`)}
-                        className="link-btn"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(b.id)}
-                        className="link-btn link-btn-danger"
-                      >
-                        Desactivar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => onReactivate(b.id)}
-                        className="link-btn"
-                      >
-                        Reactivar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onHardDelete(b.id)}
-                        className="link-btn link-btn-danger"
-                      >
-                        Eliminar
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-
-            {filtered.length === 0 && (
-              <tr>
-                <td className="table-cell-empty" colSpan={3}>
-                  {showInactive
-                    ? 'No hay bodegas inactivas que coincidan con la búsqueda.'
-                    : 'No hay bodegas registradas que coincidan con la búsqueda.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <BodegaFormModal
+        open={formOpen}
+        bodegaId={formId}
+        onClose={closeForm}
+        onSaved={load}
+      />
     </div>
   );
 }

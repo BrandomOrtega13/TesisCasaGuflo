@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
-import api from '../lib/api';
-import ProductDetailModal from '../components/ProductDetailModal';
-import ProductFormModal from '../components/ProductFormModal';
+import { useEffect, useState } from "react";
+import api from "../lib/api";
+import ProductDetailModal from "../components/ProductDetailModal";
+import ProductFormModal from "../components/ProductFormModal";
 
 type Producto = {
   id: string;
@@ -25,8 +25,7 @@ export default function ProductsList() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  const [search, setSearch] = useState('');
-
+  const [search, setSearch] = useState("");
 
   // === modal detalle ===
   const [detailOpen, setDetailOpen] = useState(false);
@@ -66,15 +65,15 @@ export default function ProductsList() {
     setMsg(null);
     try {
       const [aRes, iRes] = await Promise.all([
-        api.get('/productos'),
-        api.get('/productos/inactivos'),
+        api.get("/productos"),
+        api.get("/productos/inactivos"),
       ]);
 
       setActivos(aRes.data);
       setInactivos(iRes.data);
     } catch (err: any) {
       console.error(err);
-      const m = err.response?.data?.message || 'Error al cargar productos';
+      const m = err.response?.data?.message || "Error al cargar productos";
       setMsg(m);
     } finally {
       setLoading(false);
@@ -86,13 +85,13 @@ export default function ProductsList() {
   }, []);
 
   const onDeactivate = async (id: string) => {
-    if (!window.confirm('¿Desactivar este producto?')) return;
+    if (!window.confirm("¿Desactivar este producto?")) return;
     try {
       await api.delete(`/productos/${id}`);
       load();
     } catch (err) {
       console.error(err);
-      setMsg('Error al desactivar producto');
+      setMsg("Error al desactivar producto");
     }
   };
 
@@ -102,14 +101,14 @@ export default function ProductsList() {
       load();
     } catch (err) {
       console.error(err);
-      setMsg('Error al reactivar producto');
+      setMsg("Error al reactivar producto");
     }
   };
 
   const onHardDelete = async (id: string) => {
     if (
       !window.confirm(
-        '⚠ Esta acción eliminará el producto definitivamente, incluso si tiene movimientos.\n\n¿Continuar?'
+        "⚠ Esta acción eliminará el producto definitivamente, incluso si tiene movimientos.\n\n¿Continuar?",
       )
     ) {
       return;
@@ -121,7 +120,7 @@ export default function ProductsList() {
       console.error(err);
       const m =
         err.response?.data?.message ||
-        'No se pudo eliminar el producto (revisa el backend).';
+        "No se pudo eliminar el producto (revisa el backend).";
       setMsg(m);
     }
   };
@@ -134,7 +133,7 @@ export default function ProductsList() {
     return (
       p.sku?.toLowerCase().includes(q) ||
       p.nombre?.toLowerCase().includes(q) ||
-      (p.categoria ?? '').toLowerCase().includes(q)
+      (p.categoria ?? "").toLowerCase().includes(q)
     );
   });
 
@@ -193,8 +192,8 @@ export default function ProductsList() {
                 type="button"
                 onClick={() => setShowInactive(false)}
                 className={
-                  'segmented-button ' +
-                  (!showInactive ? 'segmented-button--active' : '')
+                  "segmented-button " +
+                  (!showInactive ? "segmented-button--active" : "")
                 }
               >
                 Activos
@@ -203,8 +202,8 @@ export default function ProductsList() {
                 type="button"
                 onClick={() => setShowInactive(true)}
                 className={
-                  'segmented-button ' +
-                  (showInactive ? 'segmented-button--active' : '')
+                  "segmented-button " +
+                  (showInactive ? "segmented-button--active" : "")
                 }
               >
                 Inactivos
@@ -212,11 +211,7 @@ export default function ProductsList() {
             </div>
 
             {!showInactive && (
-              <button
-                type="button"
-                onClick={openNew}
-                className="btn-primary"
-              >
+              <button type="button" onClick={openNew} className="btn-primary">
                 + Nuevo producto
               </button>
             )}
@@ -227,10 +222,10 @@ export default function ProductsList() {
         {msg && (
           <p
             className={
-              'list-message ' +
-              (msg.includes('Error')
-                ? 'list-message-error'
-                : 'list-message-success')
+              "list-message " +
+              (msg.includes("Error")
+                ? "list-message-error"
+                : "list-message-success")
             }
           >
             {msg}
@@ -259,64 +254,68 @@ export default function ProductsList() {
                 const stockBajo = isStockBajo(stock);
 
                 const rowClass =
-                  'table-row' + (stockBajo ? ' stock-low-row' : '');
+                  "table-row" + (stockBajo ? " stock-low-row" : "");
 
                 return (
                   <tr key={p.id} className={rowClass}>
                     <td className="table-cell">{p.sku}</td>
                     <td className="table-cell">{p.nombre}</td>
-                    <td className="table-cell">{p.categoria || '—'}</td>
+                    <td className="table-cell">{p.categoria || "—"}</td>
                     <td className="table-cell">
-                      {stock}
-                      {stockBajo && (
-                        <span className="stock-low-badge">Stock bajo</span>
-                      )}
+                      <div className="stock-cell">
+                        <span className="stock-number">{stock}</span>
+                        {stockBajo && (
+                          <span className="stock-low-badge">Stock bajo</span>
+                        )}
+                      </div>
                     </td>
-                    <td className="table-cell">{udsCaja ?? '—'}</td>
+                    <td className="table-cell">{udsCaja ?? "—"}</td>
                     <td className="table-cell">
-                      <button
-                        type="button"
-                        onClick={() => openDetail(p.id)}
-                        className="link-btn"
-                      >
-                        Ver detalles
-                      </button>
+                      <div className="actions-cell">
+                        <button
+                          type="button"
+                          onClick={() => openDetail(p.id)}
+                          className="link-btn"
+                        >
+                          Ver detalles
+                        </button>
 
-                      {!showInactive ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => openEdit(p.id)}
-                            className="link-btn"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onDeactivate(p.id)}
-                            className="link-btn link-btn-danger"
-                          >
-                            Desactivar
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => onReactivate(p.id)}
-                            className="link-btn"
-                          >
-                            Reactivar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => onHardDelete(p.id)}
-                            className="link-btn link-btn-danger"
-                          >
-                            Eliminar
-                          </button>
-                        </>
-                      )}
+                        {!showInactive ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openEdit(p.id)}
+                              className="link-btn"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onDeactivate(p.id)}
+                              className="link-btn link-btn-danger"
+                            >
+                              Desactivar
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => onReactivate(p.id)}
+                              className="link-btn"
+                            >
+                              Reactivar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onHardDelete(p.id)}
+                              className="link-btn link-btn-danger"
+                            >
+                              Eliminar
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -326,8 +325,8 @@ export default function ProductsList() {
                 <tr>
                   <td colSpan={6} className="table-cell table-cell-empty">
                     {showInactive
-                      ? 'No hay productos inactivos.'
-                      : 'No hay productos registrados.'}
+                      ? "No hay productos inactivos."
+                      : "No hay productos registrados."}
                   </td>
                 </tr>
               )}

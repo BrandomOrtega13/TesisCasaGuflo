@@ -103,6 +103,12 @@ export default function Movimientos() {
     return d.toLocaleString();
   };
 
+  const formatCantidad = (value: number) => {
+    const n = Number(value);
+    const entero = Number.isFinite(n) ? Math.round(n) : 0;
+    return new Intl.NumberFormat('es-EC', { maximumFractionDigits: 0 }).format(entero);
+  };
+
   const tipoBadgeClass = (tipo: Movimiento['tipo']) => {
     if (tipo === 'INGRESO') return 'badge badge--in';
     if (tipo === 'DESPACHO') return 'badge badge--out';
@@ -197,7 +203,7 @@ export default function Movimientos() {
                   </td>
                   <td className="table-cell">{m.bodega}</td>
                   <td className="table-cell">{m.producto}</td>
-                  <td className="table-cell">{m.cantidad}</td>
+                  <td className="table-cell">{formatCantidad(m.cantidad)}</td>
                   <td className="table-cell">{m.proveedor || m.cliente || '-'}</td>
                   <td className="table-cell">{m.usuario || '-'}</td>
                   <td className="table-cell">{m.observacion || '-'}</td>

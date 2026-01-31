@@ -7,6 +7,49 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// ======================
+// Helpers
+// ======================
+const onlyDigits = (s: any) => String(s ?? '').replace(/\D/g, '').trim();
+
+const isValidEmailFormat = (email: string) => {
+  // formato básico suficiente para backend
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+};
+
+/**
+ * Validación por API (opcional)
+ * ZeroBounce Email Validation
+ * ENV: ZEROBOUNCE_API_KEY
+ *
+ * Si no existe la key => no bloquea (solo valida formato).
+ * docs: https://zerobounce.net/docs/email-validation-api-quickstart/
+ */
+const validateEmailByAPI = async (email: string): Promise<boolean> => {
+  try {
+    const key = process.env.ZEROBOUNCE_API_KEY;
+    if (!key) return true;
+
+    const url = `https://api.zerobounce.net/v2/validate?api_key=${encodeURIComponent(
+      key
+    )}&email=${encodeURIComponent(email)}`;
+
+    const resp = await fetch(url);
+    if (!resp.ok) return true; // si falla, no bloquear
+
+    const data: any = await resp.json();
+    const status = String(data?.status ?? '').toLowerCase();
+
+    // status: valid | invalid | catch-all | unknown | spamtrap | abuse | do_not_mail
+    if (status === 'valid') return true;
+
+    // todo lo demás lo consideramos "no válido" para tu caso
+    return false;
+  } catch {
+    return true;
+  }
+};
+
 /**
  * GET /proveedores
  * Proveedores activos (sirve para selects y para la pestaña principal)
@@ -73,16 +116,50 @@ router.post('/', async (req, res) => {
   try {
     const { nombre, contacto, telefono, correo } = req.body;
 
-    if (!nombre) {
+    // ===== VALIDACIONES =====
+    if (!nombre || !String(nombre).trim()) {
       return res.status(400).json({ message: 'El nombre es obligatorio' });
     }
 
+    const contactoDigits = onlyDigits(contacto);
+    if (!contactoDigits || contactoDigits.length < 10) {
+      return res.status(400).json({
+        message: 'El contacto celular es obligatorio y debe tener mínimo 10 dígitos',
+      });
+    }
+
+    const telefonoDigits = onlyDigits(telefono);
+    if (telefonoDigits && telefonoDigits.length > 0 && telefonoDigits.length < 9) {
+      return res.status(400).json({
+        message: 'El teléfono local debe tener mínimo 9 dígitos (o dejarlo vacío)',
+      });
+    }
+
+    const correoClean = String(correo ?? '').trim();
+    if (correoClean) {
+      if (!isValidEmailFormat(correoClean)) {
+        return res.status(400).json({ message: 'El correo no tiene un formato válido' });
+      }
+
+      const ok = await validateEmailByAPI(correoClean);
+      if (!ok) {
+        return res.status(400).json({ message: 'El correo no existe o no es válido' });
+      }
+    }
+
+    // ===== INSERT =====
     const r = await pool.query(
       `INSERT INTO proveedores (nombre, contacto, telefono, correo, activo)
        VALUES ($1,$2,$3,$4, TRUE)
        RETURNING id, nombre`,
-      [nombre, contacto || null, telefono || null, correo || null]
+      [
+        String(nombre).trim(),
+        contactoDigits,
+        telefonoDigits || null,
+        correoClean || null,
+      ]
     );
+
     res.status(201).json(r.rows[0]);
   } catch (err: any) {
     console.error('Error en POST /proveedores:', err.message || err);
@@ -98,6 +175,49 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { nombre, contacto, telefono, correo, activo } = req.body;
 
+    // ===== VALIDACIONES =====
+    if (nombre !== undefined && !String(nombre).trim()) {
+      return res.status(400).json({ message: 'El nombre no puede estar vacío' });
+    }
+
+    // contacto obligatorio en tu proyecto (mínimo 10)
+    // si viene, validarlo
+    const contactoDigits =
+      contacto === undefined ? undefined : onlyDigits(contacto);
+
+    if (contactoDigits !== undefined) {
+      if (!contactoDigits || contactoDigits.length < 10) {
+        return res.status(400).json({
+          message: 'El contacto celular es obligatorio y debe tener mínimo 10 dígitos',
+        });
+      }
+    }
+
+    const telefonoDigits =
+      telefono === undefined ? undefined : onlyDigits(telefono);
+
+    if (telefonoDigits !== undefined) {
+      if (telefonoDigits && telefonoDigits.length > 0 && telefonoDigits.length < 9) {
+        return res.status(400).json({
+          message: 'El teléfono local debe tener mínimo 9 dígitos (o dejarlo vacío)',
+        });
+      }
+    }
+
+    const correoClean = correo === undefined ? undefined : String(correo ?? '').trim();
+
+    if (correoClean !== undefined && correoClean) {
+      if (!isValidEmailFormat(correoClean)) {
+        return res.status(400).json({ message: 'El correo no tiene un formato válido' });
+      }
+
+      const ok = await validateEmailByAPI(correoClean);
+      if (!ok) {
+        return res.status(400).json({ message: 'El correo no existe o no es válido' });
+      }
+    }
+
+    // ===== UPDATE =====
     const r = await pool.query(
       `UPDATE proveedores
        SET
@@ -109,10 +229,10 @@ router.put('/:id', async (req, res) => {
        WHERE id = $6
        RETURNING id, nombre`,
       [
-        nombre ?? null,
-        contacto ?? null,
-        telefono ?? null,
-        correo ?? null,
+        nombre !== undefined ? String(nombre).trim() : null,
+        contactoDigits !== undefined ? contactoDigits : null,
+        telefonoDigits !== undefined ? (telefonoDigits || null) : null,
+        correoClean !== undefined ? (correoClean || null) : null,
         typeof activo === 'boolean' ? activo : null,
         id,
       ]

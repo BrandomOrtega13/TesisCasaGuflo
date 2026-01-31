@@ -1,6 +1,11 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/auth';
 
+try {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+} catch {}
+
 const api = axios.create({
   baseURL: process.env.REACT_APP_API_URL,
 });

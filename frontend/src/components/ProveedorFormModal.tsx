@@ -8,6 +8,8 @@ type FormState = {
   correo: string;
 };
 
+const onlyDigits = (s: string) => (s ?? '').replace(/\D/g, '');
+
 export default function ProveedorFormModal({
   open,
   proveedorId,
@@ -56,7 +58,7 @@ export default function ProveedorFormModal({
         });
       } catch (err: any) {
         console.error(err);
-        setMsg('Error al cargar proveedor');
+        setMsg('Error: No se pudo cargar el proveedor');
       } finally {
         setLoading(false);
       }
@@ -85,25 +87,49 @@ export default function ProveedorFormModal({
     setLoading(true);
     setMsg(null);
 
+    // Limpieza (para permitir espacios/guiones en números)
+    const payload = {
+      nombre: form.nombre.trim(),
+      contacto: onlyDigits(form.contacto),
+      telefono: onlyDigits(form.telefono),
+      correo: form.correo.trim(),
+    };
+
     try {
-      if (!form.nombre.trim()) {
-        setMsg('El nombre es obligatorio');
+      if (!payload.nombre) {
+        setMsg('Error: El nombre es obligatorio');
         setLoading(false);
         return;
       }
 
+      // contacto: obligatorio, mínimo 10 dígitos
+      if (!payload.contacto || payload.contacto.length < 10) {
+        setMsg('Error: El contacto celular es obligatorio y debe tener mínimo 10 dígitos');
+        setLoading(false);
+        return;
+      }
+
+      // telefono: opcional, si viene debe ser mínimo 9 dígitos
+      if (payload.telefono && payload.telefono.length < 9) {
+        setMsg('Error: El teléfono local debe tener mínimo 9 dígitos (o dejarlo vacío)');
+        setLoading(false);
+        return;
+      }
+
+      // correo: opcional (el type="email" ya valida formato básico)
       if (isNew) {
-        await api.post('/proveedores', form);
+        await api.post('/proveedores', payload);
       } else {
-        await api.put(`/proveedores/${proveedorId}`, form);
+        await api.put(`/proveedores/${proveedorId}`, payload);
       }
 
       onSaved(); // refresca lista
       onClose(); // cierra modal
     } catch (err: any) {
       console.error(err);
-      const m = err?.response?.data?.message || 'Error al guardar proveedor';
-      setMsg(m);
+      const m = err?.response?.data?.message || 'Error: No se pudo guardar el proveedor';
+      // Asegurar prefijo para que se pinte como error
+      setMsg(String(m).startsWith('Error') ? m : `Error: ${m}`);
     } finally {
       setLoading(false);
     }
@@ -113,94 +139,117 @@ export default function ProveedorFormModal({
 
   return (
     <div className="modal-overlay" onMouseDown={onClose}>
-      <div className="modal-card" onMouseDown={(e) => e.stopPropagation()}>
-        <div className="modal-head">
-          <div className="modal-title">
-            {isNew ? 'Nuevo proveedor' : 'Editar proveedor'}
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="modal-close"
-            aria-label="Cerrar"
-            title="Cerrar"
-          >
-            ✕
-          </button>
-        </div>
-
+      <div
+        className="modal-card"
+        onMouseDown={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
         <div className="modal-body">
-          {loading && <p className="list-message">Cargando...</p>}
+          <div className="card">
+            <div className="prov-modal-head">
+              <h2 className="form-title" style={{ margin: 0 }}>
+                {isNew ? 'Nuevo proveedor' : 'Editar proveedor'}
+              </h2>
 
-          {msg && (
-            <p
-              className={
-                'form-message ' +
-                (msg.includes('Error')
-                  ? 'form-message-error'
-                  : 'form-message-success')
-              }
-            >
-              {msg}
-            </p>
-          )}
-
-          <form onSubmit={onSubmit} className="form-grid">
-            <div className="form-field">
-              <label className="form-label">Nombre *</label>
-              <input
-                name="nombre"
-                value={form.nombre}
-                onChange={onChange}
-                className="form-input"
-                required
-              />
-            </div>
-
-            <div className="form-field">
-              <label className="form-label">Contacto</label>
-              <input
-                name="contacto"
-                value={form.contacto}
-                onChange={onChange}
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-field">
-              <label className="form-label">Teléfono</label>
-              <input
-                name="telefono"
-                value={form.telefono}
-                onChange={onChange}
-                className="form-input"
-              />
-            </div>
-
-            <div className="form-field">
-              <label className="form-label">Correo</label>
-              <input
-                name="correo"
-                value={form.correo}
-                onChange={onChange}
-                className="form-input"
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button type="submit" disabled={loading} className="btn-primary">
-                {loading ? 'Guardando...' : 'Guardar'}
-              </button>
               <button
                 type="button"
-                className="btn-secondary"
                 onClick={onClose}
+                className="prov-modal-close"
+                aria-label="Cerrar"
+                title="Cerrar"
               >
-                Cancelar
+                ✕
               </button>
             </div>
-          </form>
+
+            {loading && <p className="list-message">Cargando...</p>}
+
+            {msg && (
+              <p
+                className={
+                  'form-message ' +
+                  (msg.includes('Error') ? 'form-message-error' : 'form-message-success')
+                }
+              >
+                {msg}
+              </p>
+            )}
+
+            <form onSubmit={onSubmit} className="form-grid">
+              <div className="form-field">
+                <label className="form-label">Nombre *</label>
+                <input
+                  name="nombre"
+                  value={form.nombre}
+                  onChange={onChange}
+                  className="form-input"
+                  required
+                  placeholder="Obligatorio"
+                />
+              </div>
+
+              <div className="form-field">
+                <label className="form-label">Contacto Celular</label>
+                <input
+                  name="contacto"
+                  value={form.contacto}
+                  onChange={onChange}
+                  className="form-input"
+                  inputMode="numeric"
+                  required
+                  pattern="[0-9]{10,}"
+                  minLength={10}
+                  title="El contacto celular es obligatorio y debe tener mínimo 10 dígitos"
+                  onInvalid={(e) =>
+                    (e.currentTarget as HTMLInputElement).setCustomValidity(
+                      'El contacto celular es obligatorio y debe tener mínimo 10 dígitos'
+                    )    
+                  }
+                  onInput={(e) => (e.currentTarget as HTMLInputElement).setCustomValidity('')}
+                  placeholder="Obligatorio (mínimo 10 dígitos)"
+                />
+              </div>
+
+              <div className="form-field">
+                <label className="form-label">Teléfono Local</label>
+                <input
+                  name="telefono"
+                  value={form.telefono}
+                  onChange={onChange}
+                  className="form-input"
+                  inputMode="numeric"
+                  pattern="[0-9]{9,}"
+                  minLength={9}
+                  title="El teléfono local debe tener mínimo 9 dígitos (o déjalo vacío)"
+                  onInvalid={(e) =>
+                    (e.currentTarget as HTMLInputElement).setCustomValidity(
+                      'El teléfono local debe tener mínimo 9 dígitos (o déjalo vacío)'
+                    )
+                  }
+                  onInput={(e) => (e.currentTarget as HTMLInputElement).setCustomValidity('')}
+                  placeholder="Opcional (mínimo 9 dígitos)"
+                />
+              </div>
+
+              <div className="form-field">
+                <label className="form-label">Correo</label>
+                <input
+                  name="correo"
+                  value={form.correo}
+                  onChange={onChange}
+                  className="form-input"
+                  type="email"
+                  placeholder="Opcional"
+                  autoComplete="email"
+                />
+              </div>
+
+              <button type="submit" disabled={loading} className="btn-primary btn-block">
+                {loading ? 'Guardando...' : 'Guardar'}
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

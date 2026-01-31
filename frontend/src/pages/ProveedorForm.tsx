@@ -80,7 +80,7 @@ export default function ProveedorForm() {
 
   return (
     <div className="form-page">
-      <div className="card">
+      <div className="card form-card-narrow">
         <button
           type="button"
           onClick={() => navigate('/proveedores')}

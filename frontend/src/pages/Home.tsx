@@ -6,7 +6,7 @@ export default function Home() {
         <div className="home-card">
           <h1>Bienvenido a Casa Guflo</h1>
           <p>
-            Gestiona productos, bodegas, proveedores, clientes y movimientos desde un solo lugar.
+            Gestiona tus productos, bodegas, proveedores, clientes y movimientos desde un solo lugar.
           </p>
 
           <div className="home-actions">

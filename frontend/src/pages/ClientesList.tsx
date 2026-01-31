@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import api from '../lib/api';
+import ClienteFormModal from '../components/ClienteFormModal';
 
 type Cliente = {
   id: string;
@@ -18,7 +18,22 @@ export default function ClientesList() {
   const [msg, setMsg] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
-  const navigate = useNavigate();
+  // modal
+  const [formOpen, setFormOpen] = useState(false);
+  const [formId, setFormId] = useState<string | null>(null);
+
+  const openNew = () => {
+    setFormId(null);
+    setFormOpen(true);
+  };
+  const openEdit = (id: string) => {
+    setFormId(id);
+    setFormOpen(true);
+  };
+  const closeForm = () => {
+    setFormOpen(false);
+    setFormId(null);
+  };
 
   const load = async () => {
     setLoading(true);
@@ -98,140 +113,150 @@ export default function ClientesList() {
   });
 
   return (
-    <div>
-      {/* Cabecera de página */}
-      <div className="page-header">
-        <h2 className="page-header-title">Clientes</h2>
-        <div className="page-header-actions">
-          <input
-            type="text"
-            placeholder="Buscar por cédula, nombre, teléfono o correo..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="search-input"
-          />
-
-          <div className="segmented">
-            <button
-              type="button"
-              onClick={() => setShowInactive(false)}
-              className={
-                'segmented-button ' +
-                (!showInactive ? 'segmented-button--active' : '')
-              }
-            >
-              Activos
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowInactive(true)}
-              className={
-                'segmented-button ' +
-                (showInactive ? 'segmented-button--active' : '')
-              }
-            >
-              Inactivos
-            </button>
+    <div className="page">
+      <div className="card page-head-card">
+        <div className="page-header">
+          <div>
+            <h2 className="page-header-title">Clientes</h2>
+            <div className="page-subtitle">
+              Administra tus clientes: crea, edita, desactiva y reactiva.
+            </div>
           </div>
 
-          {!showInactive && (
-            <button
-              type="button"
-              onClick={() => navigate('/clientes/nuevo')}
-              className="btn-primary"
-            >
-              + Nuevo cliente
-            </button>
-          )}
+          <div className="page-header-actions">
+            <input
+              type="text"
+              placeholder="Buscar por cédula, nombre, teléfono o correo..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="search-input"
+            />
+
+            <div className="segmented">
+              <button
+                type="button"
+                onClick={() => setShowInactive(false)}
+                className={
+                  'segmented-button ' +
+                  (!showInactive ? 'segmented-button--active' : '')
+                }
+              >
+                Activos
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowInactive(true)}
+                className={
+                  'segmented-button ' +
+                  (showInactive ? 'segmented-button--active' : '')
+                }
+              >
+                Inactivos
+              </button>
+            </div>
+
+            {!showInactive && (
+              <button type="button" onClick={openNew} className="btn-primary">
+                + Nuevo cliente
+              </button>
+            )}
+          </div>
+        </div>
+
+        {loading && <p className="list-message">Cargando...</p>}
+        {msg && (
+          <p
+            className={
+              'list-message ' +
+              (msg.includes('Error')
+                ? 'list-message-error'
+                : 'list-message-success')
+            }
+          >
+            {msg}
+          </p>
+        )}
+      </div>
+
+      <div className="card table-card">
+        <div className="table-container">
+          <table className="table">
+            <thead>
+              <tr>
+                <th className="table-header-cell">Identificación</th>
+                <th className="table-header-cell">Nombre</th>
+                <th className="table-header-cell">Teléfono</th>
+                <th className="table-header-cell">Correo</th>
+                <th className="table-header-cell">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((c) => (
+                <tr key={c.id} className="table-row">
+                  <td className="table-cell">{c.identificacion || '—'}</td>
+                  <td className="table-cell">{c.nombre}</td>
+                  <td className="table-cell">{c.telefono || '—'}</td>
+                  <td className="table-cell">{c.correo || '—'}</td>
+                  <td className="table-cell">
+                    {!showInactive ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => openEdit(c.id)}
+                          className="link-btn"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDelete(c.id, c.nombre)}
+                          className="link-btn link-btn-danger"
+                        >
+                          Desactivar
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => onReactivate(c.id, c.nombre)}
+                          className="link-btn"
+                        >
+                          Reactivar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onHardDelete(c.id, c.nombre)}
+                          className="link-btn link-btn-danger"
+                        >
+                          Eliminar
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+
+              {rows.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="table-cell table-cell-empty">
+                    {showInactive
+                      ? 'No hay clientes inactivos.'
+                      : 'No hay clientes registrados.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
-      {/* Mensajes */}
-      {loading && <p>Cargando...</p>}
-      {msg && (
-        <p
-          className={
-            'list-message ' +
-            (msg.includes('Error')
-              ? 'list-message-error'
-              : 'list-message-success')
-          }
-        >
-          {msg}
-        </p>
-      )}
-
-      {/* Tabla */}
-      <div className="table-container">
-        <table className="table">
-          <thead>
-            <tr>
-              <th className="table-header-cell">Identificación</th>
-              <th className="table-header-cell">Nombre</th>
-              <th className="table-header-cell">Teléfono</th>
-              <th className="table-header-cell">Correo</th>
-              <th className="table-header-cell">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((c) => (
-              <tr key={c.id} className="table-row">
-                <td className="table-cell">{c.identificacion || '—'}</td>
-                <td className="table-cell">{c.nombre}</td>
-                <td className="table-cell">{c.telefono || '—'}</td>
-                <td className="table-cell">{c.correo || '—'}</td>
-                <td className="table-cell">
-                  {!showInactive ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/clientes/${c.id}`)}
-                        className="link-btn"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDelete(c.id, c.nombre)}
-                        className="link-btn link-btn-danger"
-                      >
-                        Desactivar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => onReactivate(c.id, c.nombre)}
-                        className="link-btn"
-                      >
-                        Reactivar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onHardDelete(c.id, c.nombre)}
-                        className="link-btn link-btn-danger"
-                      >
-                        Eliminar
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={5} className="table-cell table-cell-empty">
-                  {showInactive
-                    ? 'No hay clientes inactivos.'
-                    : 'No hay clientes registrados.'}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ClienteFormModal
+        open={formOpen}
+        clienteId={formId}
+        onClose={closeForm}
+        onSaved={load}
+      />
     </div>
   );
 }

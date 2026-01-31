@@ -121,7 +121,7 @@ export default function ProveedoresList() {
           <div>
             <h2 className="page-header-title">Proveedores</h2>
             <div className="page-subtitle">
-              Administra tus proveedores: crea, edita, desactiva y reactiva.
+              Administra tus proveedores.
             </div>
           </div>
 
@@ -187,8 +187,8 @@ export default function ProveedoresList() {
             <thead>
               <tr>
                 <th className="table-header-cell">Nombre</th>
-                <th className="table-header-cell">Contacto</th>
-                <th className="table-header-cell">Teléfono</th>
+                <th className="table-header-cell">Contacto Celular</th>
+                <th className="table-header-cell">Teléfono Local</th>
                 <th className="table-header-cell">Correo</th>
                 <th className="table-header-cell">Acciones</th>
               </tr>

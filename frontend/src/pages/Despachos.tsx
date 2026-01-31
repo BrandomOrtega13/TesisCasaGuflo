@@ -9,19 +9,19 @@ type Producto = {
   nombre: string;
   precio_venta: number;
   precio_mayorista: number;
-  precio_caja: number;
+  precio_caja: number; // por unidad en modo caja
   unidades_por_caja?: number | null;
 };
 
 type PrecioTipo = 'NORMAL' | 'MAYORISTA' | 'CAJA' | 'DESCUENTO';
 
 type Detalle = {
+  bodega_id: string;           // 👈 NUEVO (bodega por línea)
   producto_id: string;
-  cantidad: number; // unidades
+  cantidad: number;            // unidades
   precio_unitario?: number;
   precio_tipo: PrecioTipo;
   motivo_descuento?: string;
-  cajas?: number;
 };
 
 const money = (n: number) =>
@@ -35,12 +35,12 @@ export default function Despachos() {
   const [productos, setProductos] = useState<Producto[]>([]);
 
   const defaultDetalle: Detalle = {
+    bodega_id: '',
     producto_id: '',
     cantidad: 0,
     precio_tipo: 'NORMAL',
   };
 
-  const [bodegaId, setBodegaId] = useState('');
   const [clienteId, setClienteId] = useState('');
   const [observacion, setObservacion] = useState('');
   const [detalles, setDetalles] = useState<Detalle[]>([{ ...defaultDetalle }]);
@@ -48,10 +48,10 @@ export default function Despachos() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
-  // búsqueda
-  const [searchBodega, setSearchBodega] = useState('');
+  // búsquedas (estilo ingresos: búsqueda general)
   const [searchCliente, setSearchCliente] = useState('');
   const [searchProducto, setSearchProducto] = useState('');
+  const [searchBodega, setSearchBodega] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -62,10 +62,10 @@ export default function Despachos() {
           api.get('/productos'),
         ]);
 
-        setBodegas(bodRes.data);
-        setClientes(cliRes.data);
+        setBodegas(bodRes.data || []);
+        setClientes(cliRes.data || []);
         setProductos(
-          prodRes.data.map((p: any) => ({
+          (prodRes.data || []).map((p: any) => ({
             id: p.id,
             sku: p.sku,
             nombre: p.nombre,
@@ -82,32 +82,19 @@ export default function Despachos() {
     load();
   }, []);
 
-  const getPriceFor = (
-    prod: Producto | undefined,
-    tipo: PrecioTipo,
-    fallback?: number
-  ) => {
+  const getPriceFor = (prod: Producto | undefined, tipo: PrecioTipo, fallback?: number) => {
     if (!prod) return fallback ?? 0;
 
     if (tipo === 'NORMAL') return prod.precio_venta || 0;
-
-    if (tipo === 'MAYORISTA') {
-      return prod.precio_mayorista || prod.precio_venta || 0;
-    }
-
-    if (tipo === 'CAJA') {
-      // precio_caja es precio por unidad (modo caja)
-      return prod.precio_caja || 0;
-    }
+    if (tipo === 'MAYORISTA') return prod.precio_mayorista || prod.precio_venta || 0;
+    if (tipo === 'CAJA') return prod.precio_caja || 0;
 
     // DESCUENTO
     return fallback ?? (prod.precio_venta || 0);
   };
 
   const updateDetalle = (index: number, patch: Partial<Detalle>) => {
-    setDetalles((prev) =>
-      prev.map((d, i) => (i === index ? { ...d, ...patch } : d))
-    );
+    setDetalles((prev) => prev.map((d, i) => (i === index ? { ...d, ...patch } : d)));
   };
 
   const onChangeProducto = (i: number, producto_id: string) => {
@@ -116,13 +103,11 @@ export default function Despachos() {
 
     const tipo = d.precio_tipo;
     const precioBase = getPriceFor(prod, tipo, d.precio_unitario);
-    const precio =
-      tipo === 'DESCUENTO' ? d.precio_unitario ?? precioBase : precioBase;
+    const precio = tipo === 'DESCUENTO' ? d.precio_unitario ?? precioBase : precioBase;
 
     updateDetalle(i, {
       producto_id,
-      precio_tipo: tipo,
-      precio_unitario: tipo === 'DESCUENTO' ? d.precio_unitario : precio,
+      precio_unitario: tipo === 'DESCUENTO' ? (d.precio_unitario ?? precioBase) : precio,
     });
   };
 
@@ -136,77 +121,21 @@ export default function Despachos() {
       updateDetalle(i, {
         precio_tipo,
         precio_unitario: precio,
-        cajas: undefined,
         motivo_descuento: undefined,
       });
     } else {
-      if (d.precio_unitario == null) {
-        precio = prod?.precio_venta || 0;
-      }
-      updateDetalle(i, {
-        precio_tipo,
-        precio_unitario: precio,
-        cajas: undefined,
-      });
+      if (d.precio_unitario == null) precio = prod?.precio_venta || 0;
+      updateDetalle(i, { precio_tipo, precio_unitario: precio });
     }
   };
 
   const onChangeCantidad = (i: number, value: number) => {
     const n = Number(value);
-    const cantidad = Number.isFinite(n) ? n : 0;
-    updateDetalle(i, { cantidad });
+    updateDetalle(i, { cantidad: Number.isFinite(n) ? n : 0 });
   };
 
-  const addDetalle = () =>
-    setDetalles((prev) => [...prev, { ...defaultDetalle }]);
-
-  const removeDetalle = (index: number) =>
-    setDetalles((prev) => prev.filter((_, i) => i !== index));
-
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setMsg(null);
-
-    try {
-      const limpios = detalles
-        .filter((d) => d.producto_id && d.cantidad > 0)
-        .map((d) => ({
-          producto_id: d.producto_id,
-          cantidad: d.cantidad,
-          precio_unitario: d.precio_unitario ?? null,
-          precio_tipo: d.precio_tipo || null,
-          motivo_descuento:
-            d.precio_tipo === 'DESCUENTO' ? d.motivo_descuento || null : null,
-        }));
-
-      if (!bodegaId || limpios.length === 0) {
-        setMsg('Seleccione bodega y al menos un producto con cantidad > 0');
-        setLoading(false);
-        return;
-      }
-
-      await api.post('/movimientos/despachos', {
-        bodega_id: bodegaId,
-        cliente_id: clienteId || null,
-        observacion,
-        detalles: limpios,
-      });
-
-      setMsg('Despacho registrado correctamente');
-      setDetalles([{ ...defaultDetalle }]);
-      setObservacion('');
-    } catch (err: any) {
-      console.error(err);
-      const m =
-        err.response?.data?.message ||
-        err.response?.data?.detail ||
-        'Error al registrar despacho';
-      setMsg(m);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const addDetalle = () => setDetalles((prev) => [...prev, { ...defaultDetalle }]);
+  const removeDetalle = (index: number) => setDetalles((prev) => prev.filter((_, i) => i !== index));
 
   const isReadOnlyPrice = (tipo: PrecioTipo) => tipo !== 'DESCUENTO';
 
@@ -222,7 +151,7 @@ export default function Despachos() {
 
   const getLineaTotal = (d: Detalle) => {
     const precio = d.precio_unitario ?? 0;
-    if (!precio) return 0;
+    if (!precio || !d.cantidad) return 0;
     return d.cantidad * precio;
   };
 
@@ -230,12 +159,6 @@ export default function Despachos() {
   const bodegasFiltradasBase = bodegas.filter((b) =>
     b.nombre.toLowerCase().includes(searchBodega.toLowerCase())
   );
-  const selectedBodega = bodegas.find((b) => b.id === bodegaId);
-  const bodegasFiltradas = selectedBodega
-    ? bodegasFiltradasBase.some((b) => b.id === selectedBodega.id)
-      ? bodegasFiltradasBase
-      : [selectedBodega, ...bodegasFiltradasBase]
-    : bodegasFiltradasBase;
 
   const clientesFiltradosBase = clientes.filter((c) =>
     c.nombre.toLowerCase().includes(searchCliente.toLowerCase())
@@ -252,25 +175,90 @@ export default function Despachos() {
     return texto.includes(searchProducto.toLowerCase());
   });
 
-  // total general (UI)
   const totalGeneral = useMemo(() => {
     return detalles.reduce((acc, d) => acc + getLineaTotal(d), 0);
   }, [detalles]);
 
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMsg(null);
+
+    try {
+      // 1) limpiar líneas válidas
+      const limpios = detalles
+        .filter((d) => d.bodega_id && d.producto_id && d.cantidad > 0)
+        .map((d) => ({
+          bodega_id: d.bodega_id,
+          producto_id: d.producto_id,
+          cantidad: d.cantidad,
+          precio_unitario: d.precio_unitario ?? null,
+          precio_tipo: d.precio_tipo || null,
+          motivo_descuento: d.precio_tipo === 'DESCUENTO' ? d.motivo_descuento || null : null,
+        }));
+
+      if (limpios.length === 0) {
+        setMsg('Seleccione bodega y al menos un producto con cantidad > 0');
+        setLoading(false);
+        return;
+      }
+
+      // 2) agrupar por bodega -> se crean varios despachos (sin tocar backend)
+      const groups = limpios.reduce<Record<string, any[]>>((acc, d) => {
+        (acc[d.bodega_id] ||= []).push(d);
+        return acc;
+      }, {});
+
+      const bodegasIds = Object.keys(groups);
+
+      // 3) ejecutar 1 POST por bodega (secuencial para que el msg sea claro)
+      for (const bodega_id of bodegasIds) {
+        const detallesBodega = groups[bodega_id].map(({ bodega_id: _omit, ...rest }) => rest);
+
+        await api.post('/movimientos/despachos', {
+          bodega_id,
+          cliente_id: clienteId || null,
+          observacion,
+          detalles: detallesBodega,
+        });
+      }
+
+      setMsg(
+        bodegasIds.length === 1
+          ? 'Despacho registrado correctamente'
+          : `Despachos registrados correctamente (${bodegasIds.length} bodegas)`
+      );
+
+      setDetalles([{ ...defaultDetalle }]);
+      setObservacion('');
+      setClienteId('');
+      setSearchProducto('');
+    } catch (err: any) {
+      console.error(err);
+      const m =
+        err.response?.data?.message ||
+        err.response?.data?.detail ||
+        'Error al registrar despacho';
+      setMsg(m);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="mov-page">
-      {/* HEADER */}
-      <div className="mov-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+    <div className="page mov-page">
+      {/* Header (igual estilo que ingresos: card grande arriba) */}
+      <div className="card page-head-card">
+        <div className="page-header" style={{ alignItems: 'flex-start' }}>
           <div>
-            <h2>Despachos</h2>
-            <p>Registra salidas de inventario y calcula totales por línea.</p>
+            <h2 className="page-header-title">Despachos</h2>
+            <div className="page-subtitle">Registra las salidas de inventario.</div>
           </div>
 
-          <div style={{ textAlign: 'right', minWidth: 160 }}>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Total</div>
-            <div style={{ fontSize: 20, fontWeight: 900 }}>
-              {money(totalGeneral)}
+          <div className="mov-summary">
+            <div className="mov-summary-item">
+              <div className="mov-summary-label">Total</div>
+              <div className="mov-summary-value">{money(totalGeneral)}</div>
             </div>
           </div>
         </div>
@@ -278,262 +266,260 @@ export default function Despachos() {
         {msg && (
           <p
             className={
-              'form-message ' +
-              (msg.includes('Error')
-                ? 'form-message-error'
-                : 'form-message-success')
+              'form-message ' + (msg.includes('Error') ? 'form-message-error' : 'form-message-success')
             }
-            style={{ marginTop: 12 }}
+            style={{ marginTop: 10 }}
           >
             {msg}
           </p>
         )}
       </div>
 
-      {/* FORM */}
-      <form onSubmit={onSubmit} className="mov-card">
-        {/* CABECERA */}
-        <div className="mov-section">
-          <div className="mov-section-title">Cabecera</div>
+      {/* Form (mismo look que ingresos) */}
+      <div className="form-card-wide">
+        <form onSubmit={onSubmit}>
+          {/* Cabecera */}
+          <div className="form-section">
+            <div className="form-section-title">Cabecera</div>
 
-          <div className="mov-grid-2">
-            {/* Bodega */}
-            <div className="form-field">
-              <label className="form-label">Bodega</label>
+            <div className="grid-2">
+              <div className="form-field">
+                <label className="form-label">Cliente (opcional)</label>
+                <input
+                  placeholder="Buscar cliente..."
+                  value={searchCliente}
+                  onChange={(e) => setSearchCliente(e.target.value)}
+                  className="form-input"
+                />
+                <select
+                  value={clienteId}
+                  onChange={(e) => setClienteId(e.target.value)}
+                  className="form-select"
+                >
+                  <option value="">Sin cliente</option>
+                  {clientesFiltrados.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label className="form-label">Observación</label>
+                <input
+                  value={observacion}
+                  onChange={(e) => setObservacion(e.target.value)}
+                  className="form-input"
+                  placeholder="Ej: venta, pedido, despacho, devolución..."
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Detalle */}
+          <div className="form-section">
+            <div className="form-section-title">Detalle</div>
+
+            <div className="inline-card" style={{ marginBottom: 12 }}>
+              <label className="form-label" style={{ marginBottom: 6 }}>
+                Buscar producto
+              </label>
               <input
-                placeholder="Buscar bodega..."
+                placeholder="SKU o nombre..."
+                value={searchProducto}
+                onChange={(e) => setSearchProducto(e.target.value)}
+                className="form-input"
+              />
+            </div>
+
+            {/* filtro bodega (opcional) para lista más corta */}
+            <div className="inline-card" style={{ marginBottom: 12 }}>
+              <label className="form-label" style={{ marginBottom: 6 }}>
+                Buscar bodega
+              </label>
+              <input
+                placeholder="Nombre de bodega..."
                 value={searchBodega}
                 onChange={(e) => setSearchBodega(e.target.value)}
                 className="form-input"
               />
-              <select
-                value={bodegaId}
-                onChange={(e) => setBodegaId(e.target.value)}
-                required
-                className="form-input"
-              >
-                <option value="">Seleccione bodega</option>
-                {bodegasFiltradas.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.nombre}
-                  </option>
-                ))}
-              </select>
+              <div className="mov-hint">La bodega se selecciona por cada línea.</div>
             </div>
 
-            {/* Cliente */}
-            <div className="form-field">
-              <label className="form-label">Cliente (opcional)</label>
-              <input
-                placeholder="Buscar cliente..."
-                value={searchCliente}
-                onChange={(e) => setSearchCliente(e.target.value)}
-                className="form-input"
-              />
-              <select
-                value={clienteId}
-                onChange={(e) => setClienteId(e.target.value)}
-                className="form-input"
-              >
-                <option value="">Sin cliente</option>
-                {clientesFiltrados.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+            {detalles.map((d, i) => {
+              const prod = productos.find((p) => p.id === d.producto_id);
+              const upc = prod?.unidades_por_caja || 0;
 
-          <div className="mov-grid-1">
-            <div className="form-field">
-              <label className="form-label">Observación</label>
-              <input
-                value={observacion}
-                onChange={(e) => setObservacion(e.target.value)}
-                className="form-input"
-                placeholder="Ej: venta, pedido, despacho, devolución..."
-              />
-            </div>
-          </div>
-        </div>
+              const opcionesProducto = (() => {
+                const base = [...productosFiltradosBase];
+                const seleccionado = productos.find((p) => p.id === d.producto_id);
+                if (seleccionado && !base.some((p) => p.id === seleccionado.id)) {
+                  return [seleccionado, ...base];
+                }
+                return base;
+              })();
 
-        {/* DETALLE */}
-        <div className="mov-section">
-          <div className="mov-section-title">Detalle</div>
+              const totalLinea = getLineaTotal(d);
 
-          <input
-            placeholder="Buscar producto (SKU o nombre)..."
-            value={searchProducto}
-            onChange={(e) => setSearchProducto(e.target.value)}
-            className="form-input mov-detail-search"
-          />
+              let cajasEq = 0;
+              let restoEq = 0;
+              if (d.precio_tipo === 'CAJA' && upc > 0 && d.cantidad > 0) {
+                cajasEq = Math.floor(d.cantidad / upc);
+                restoEq = d.cantidad % upc;
+              }
 
-          {detalles.map((d, i) => {
-            const prod = productos.find((p) => p.id === d.producto_id);
-            const upc = prod?.unidades_por_caja || 0;
+              return (
+                <div key={i} className="inline-card" style={{ marginBottom: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <div style={{ fontWeight: 900 }}>
+                      Línea #{i + 1}
+                      {prod ? <span style={{ fontWeight: 700, color: '#64748b' }}> · {prod.sku} — {prod.nombre}</span> : null}
+                    </div>
 
-            const opcionesProducto = (() => {
-              const base = [...productosFiltradosBase];
-              const sel = productos.find((p) => p.id === d.producto_id);
-              if (sel && !base.some((p) => p.id === sel.id)) return [sel, ...base];
-              return base;
-            })();
-
-            const totalLinea = getLineaTotal(d);
-
-            let cajasEq = 0;
-            let restoEq = 0;
-            if (d.precio_tipo === 'CAJA' && upc > 0 && d.cantidad > 0) {
-              cajasEq = Math.floor(d.cantidad / upc);
-              restoEq = d.cantidad % upc;
-            }
-
-            return (
-              <div key={i} className="inline-card" style={{ marginBottom: 12 }}>
-                <div className="mov-grid-2">
-                  {/* Producto */}
-                  <div className="form-field">
-                    <label className="form-label">Producto</label>
-                    <select
-                      value={d.producto_id}
-                      onChange={(e) => onChangeProducto(i, e.target.value)}
-                      required
-                      className="form-input"
-                    >
-                      <option value="">Seleccione producto</option>
-                      {opcionesProducto.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.sku} - {p.nombre}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Tipo precio */}
-                  <div className="form-field">
-                    <label className="form-label">Tipo</label>
-                    <select
-                      value={d.precio_tipo}
-                      onChange={(e) =>
-                        onChangePrecioTipo(i, e.target.value as PrecioTipo)
-                      }
-                      className="form-input"
-                    >
-                      <option value="NORMAL">Venta</option>
-                      <option value="MAYORISTA">Mayorista</option>
-                      <option value="CAJA">Caja</option>
-                      <option value="DESCUENTO">Descuento</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Cantidad / Precio / Total */}
-                <div className="mov-grid-2" style={{ marginTop: 12 }}>
-                  <div className="form-field">
-                    <label className="form-label">Cantidad (unidades)</label>
-                    <input
-                      type="number"
-                      placeholder="0"
-                      value={d.cantidad || ''}
-                      onChange={(e) =>
-                        onChangeCantidad(i, Number(e.target.value))
-                      }
-                      className="form-input"
-                      min={0}
-                    />
-
-                    {d.precio_tipo === 'CAJA' && upc > 0 && (
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                        1 caja = {upc} unidades
-                        {d.cantidad > 0 && (
-                          <>
-                            <br />
-                            Equivale a {cajasEq} caja(s)
-                            {restoEq > 0 ? ` + ${restoEq} unidad(es)` : ''}
-                          </>
-                        )}
-                      </div>
+                    {detalles.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeDetalle(i)}
+                        className="btn-icon-danger"
+                        title="Quitar línea"
+                      >
+                        ✕
+                      </button>
                     )}
                   </div>
 
-                  <div className="form-field">
-                    <label className="form-label">
-                      Precio unitario ({tipoBadge(d.precio_tipo)})
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      value={d.precio_unitario ?? ''}
-                      onChange={(e) => {
-                        if (isReadOnlyPrice(d.precio_tipo)) return;
-                        updateDetalle(i, {
-                          precio_unitario: Number(e.target.value) || 0,
-                        });
-                      }}
-                      className="form-input"
-                      readOnly={isReadOnlyPrice(d.precio_tipo)}
-                    />
+                  <div className="grid-2" style={{ marginTop: 12 }}>
+                    <div className="form-field">
+                      <label className="form-label">Bodega</label>
+                      <select
+                        value={d.bodega_id}
+                        onChange={(e) => updateDetalle(i, { bodega_id: e.target.value })}
+                        required
+                        className="form-select"
+                      >
+                        <option value="">Seleccione bodega</option>
+                        {bodegasFiltradasBase.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-field">
+                      <label className="form-label">Producto</label>
+                      <select
+                        value={d.producto_id}
+                        onChange={(e) => onChangeProducto(i, e.target.value)}
+                        required
+                        className="form-select"
+                      >
+                        <option value="">Seleccione producto</option>
+                        {opcionesProducto.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.sku} - {p.nombre}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid-2" style={{ marginTop: 12 }}>
+                    <div className="form-field">
+                      <label className="form-label">Tipo de precio</label>
+                      <select
+                        value={d.precio_tipo}
+                        onChange={(e) => onChangePrecioTipo(i, e.target.value as PrecioTipo)}
+                        className="form-select"
+                      >
+                        <option value="NORMAL">Venta</option>
+                        <option value="MAYORISTA">Mayorista</option>
+                        <option value="CAJA">Caja</option>
+                        <option value="DESCUENTO">Descuento</option>
+                      </select>
+                    </div>
+
+                    <div className="form-field">
+                      <label className="form-label">Cantidad (unidades)</label>
+                      <input
+                        type="number"
+                        placeholder="0"
+                        value={d.cantidad || ''}
+                        onChange={(e) => onChangeCantidad(i, Number(e.target.value))}
+                        className="form-input"
+                        min={0}
+                      />
+
+                      {d.precio_tipo === 'CAJA' && upc > 0 && (
+                        <div className="mov-hint">
+                          1 caja = <strong>{upc}</strong> unidades
+                          {d.cantidad > 0 && (
+                            <>
+                              <br />
+                              Equivale a <strong>{cajasEq}</strong> caja(s)
+                              {restoEq > 0 ? ` + ${restoEq} unidad(es)` : ''}
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid-2" style={{ marginTop: 12 }}>
+                    <div className="form-field">
+                      <label className="form-label">Precio unitario ({tipoBadge(d.precio_tipo)})</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={d.precio_unitario ?? ''}
+                        onChange={(e) => {
+                          if (isReadOnlyPrice(d.precio_tipo)) return;
+                          updateDetalle(i, { precio_unitario: Number(e.target.value) || 0 });
+                        }}
+                        className="form-input"
+                        readOnly={isReadOnlyPrice(d.precio_tipo)}
+                      />
+                    </div>
+
+                    <div className="mov-line-total" style={{ alignSelf: 'end' }}>
+                      <div className="mov-line-total-label">Total línea</div>
+                      <div className="mov-line-total-value">{money(totalLinea)}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: 12 }}>
+                    <div className="form-field">
+                      <label className="form-label">Motivo descuento (opcional)</label>
+                      <input
+                        placeholder="Solo si usas DESCUENTO"
+                        value={d.motivo_descuento ?? ''}
+                        onChange={(e) => updateDetalle(i, { motivo_descuento: e.target.value })}
+                        className="form-input"
+                        readOnly={d.precio_tipo !== 'DESCUENTO'}
+                      />
+                    </div>
                   </div>
                 </div>
+              );
+            })}
 
-                <div className="mov-grid-2" style={{ marginTop: 12 }}>
-                  <div className="form-field">
-                    <label className="form-label">Total línea</label>
-                    <input
-                      readOnly
-                      value={totalLinea ? totalLinea.toFixed(2) : ''}
-                      placeholder="0.00"
-                      className="form-input"
-                    />
-                  </div>
+            <div className="actions-bar">
+              <button type="button" onClick={addDetalle} className="btn-secondary">
+                + Agregar línea
+              </button>
+            </div>
+          </div>
 
-                  <div className="form-field">
-                    <label className="form-label">Motivo desc. (opcional)</label>
-                    <input
-                      placeholder="Solo si usas DESCUENTO"
-                      value={d.motivo_descuento ?? ''}
-                      onChange={(e) =>
-                        updateDetalle(i, { motivo_descuento: e.target.value })
-                      }
-                      className="form-input"
-                      readOnly={d.precio_tipo !== 'DESCUENTO'}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ marginTop: 12, display: 'flex', gap: 10, justifyContent: 'space-between' }}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    Línea #{i + 1}
-                  </div>
-
-                  {detalles.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeDetalle(i)}
-                      className="btn-secondary"
-                    >
-                      Quitar línea
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-
-          <button type="button" onClick={addDetalle} className="btn-secondary">
-            + Agregar línea
-          </button>
-        </div>
-
-        {/* ACCIONES */}
-        <div className="mov-actions">
-          <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? 'Guardando...' : 'Registrar despacho'}
-          </button>
-        </div>
-      </form>
+          {/* Acciones */}
+          <div className="actions-bar">
+            <button type="submit" disabled={loading} className="btn-primary">
+              {loading ? 'Guardando...' : 'Registrar despacho'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

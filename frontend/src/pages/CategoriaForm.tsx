@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import api from '../lib/api';
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import api from "../lib/api";
 
 type CategoriaFormState = {
   nombre: string;
@@ -11,11 +11,11 @@ export default function CategoriaForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const esNuevo = id === 'nueva';
+  const esNuevo = id === "nueva";
 
   const [form, setForm] = useState<CategoriaFormState>({
-    nombre: '',
-    descripcion: '',
+    nombre: "",
+    descripcion: "",
   });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -29,12 +29,12 @@ export default function CategoriaForm() {
       try {
         const res = await api.get(`/categorias/${id}`);
         setForm({
-          nombre: res.data.nombre ?? '',
-          descripcion: res.data.descripcion ?? '',
+          nombre: res.data.nombre ?? "",
+          descripcion: res.data.descripcion ?? "",
         });
       } catch (err) {
         console.error(err);
-        setMsg('Error al cargar categoría');
+        setMsg("Error al cargar categoría");
       } finally {
         setLoading(false);
       }
@@ -56,24 +56,24 @@ export default function CategoriaForm() {
 
     try {
       if (esNuevo) {
-        await api.post('/categorias', {
+        await api.post("/categorias", {
           nombre: form.nombre,
           descripcion: form.descripcion || null,
         });
-        setMsg('Categoría creada correctamente');
+        setMsg("Categoría creada correctamente");
       } else if (id) {
         await api.put(`/categorias/${id}`, {
           nombre: form.nombre,
           descripcion: form.descripcion || null,
         });
-        setMsg('Categoría actualizada correctamente');
+        setMsg("Categoría actualizada correctamente");
       }
 
-      setTimeout(() => navigate('/categorias'), 500);
+      setTimeout(() => navigate("/categorias"), 500);
     } catch (err: any) {
       console.error(err);
       const backendMsg = err?.response?.data?.message;
-      setMsg(backendMsg || 'Error al guardar categoría');
+      setMsg(backendMsg || "Error al guardar categoría");
     } finally {
       setLoading(false);
     }
@@ -85,13 +85,13 @@ export default function CategoriaForm() {
         <button
           type="button"
           className="btn-link-back"
-          onClick={() => navigate('/categorias')}
+          onClick={() => navigate("/categorias")}
         >
           ← Volver
         </button>
 
         <h2 className="form-title">
-          {esNuevo ? 'Nueva categoría' : 'Editar categoría'}
+          {esNuevo ? "Nueva categoría" : "Editar categoría"}
         </h2>
 
         {loading && <p className="form-message">Cargando...</p>}
@@ -99,7 +99,9 @@ export default function CategoriaForm() {
         {msg && (
           <p
             className={`form-message ${
-              msg.includes('Error') ? 'form-message-error' : 'form-message-success'
+              msg.includes("Error")
+                ? "form-message-error"
+                : "form-message-success"
             }`}
           >
             {msg}
@@ -112,7 +114,7 @@ export default function CategoriaForm() {
             <input
               type="text"
               value={form.nombre}
-              onChange={onChange('nombre')}
+              onChange={onChange("nombre")}
               required
               className="form-input"
             />
@@ -122,20 +124,20 @@ export default function CategoriaForm() {
             <label className="form-label">Descripción (opcional)</label>
             <textarea
               value={form.descripcion}
-              onChange={onChange('descripcion')}
+              onChange={onChange("descripcion")}
               rows={3}
-              className="form-input"
+              className="form-textarea"
             />
           </div>
 
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <div className="actions-bar">
             <button type="submit" className="btn-primary" disabled={loading}>
-              {esNuevo ? 'Crear' : 'Guardar cambios'}
+              {esNuevo ? "Crear" : "Guardar cambios"}
             </button>
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => navigate('/categorias')}
+              onClick={() => navigate("/categorias")}
             >
               Cancelar
             </button>
