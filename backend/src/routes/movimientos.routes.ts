@@ -47,7 +47,8 @@ router.post('/ingresos', async (req, res) => {
 
     if (limpios.some((d: any) => !d.bodega_id)) {
       return res.status(400).json({
-        message: 'Cada detalle debe incluir bodega_id (o enviar bodega_id en cabecera)',
+        message:
+          'Cada detalle debe incluir bodega_id (o enviar bodega_id en cabecera)',
       });
     }
 
@@ -85,11 +86,25 @@ router.post('/ingresos', async (req, res) => {
       ids.push(movimientoId);
 
       for (const d of items) {
+        // ✅ snapshot (para historial aunque eliminen el producto)
+        const prodRes = await client.query(
+          `SELECT sku, nombre FROM productos WHERE id = $1`,
+          [d.producto_id]
+        );
+        const prod = prodRes.rows[0];
+
         await client.query(
           `INSERT INTO movimiento_detalles
-             (movimiento_id, producto_id, cantidad, costo_unitario)
-           VALUES ($1, $2, $3, $4)`,
-          [movimientoId, d.producto_id, d.cantidad, d.costo_unitario]
+             (movimiento_id, producto_id, producto_sku, producto_nombre, cantidad, costo_unitario)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            movimientoId,
+            d.producto_id,
+            prod?.sku ?? null,
+            prod?.nombre ?? null,
+            d.cantidad,
+            d.costo_unitario,
+          ]
         );
         // Trigger suma stock
       }
@@ -98,9 +113,7 @@ router.post('/ingresos', async (req, res) => {
     await client.query('COMMIT');
     return res.status(201).json({
       ids,
-      message: grupos.size > 1
-        ? 'Ingresos registrados por bodega'
-        : 'Ingreso registrado',
+      message: grupos.size > 1 ? 'Ingresos registrados por bodega' : 'Ingreso registrado',
     });
   } catch (err: any) {
     await client.query('ROLLBACK');
@@ -118,14 +131,8 @@ router.post('/ingresos', async (req, res) => {
 router.post('/despachos', async (req, res) => {
   const client = await pool.connect();
   try {
-    const {
-      bodega_id,
-      cliente_id,
-      usuario_id,
-      fecha,
-      observacion,
-      detalles,
-    } = req.body;
+    const { bodega_id, cliente_id, usuario_id, fecha, observacion, detalles } =
+      req.body;
 
     if (!bodega_id || !Array.isArray(detalles) || detalles.length === 0) {
       return res.status(400).json({
@@ -159,16 +166,25 @@ router.post('/despachos', async (req, res) => {
         throw new Error('Detalle inválido en despacho');
       }
 
+      // ✅ snapshot (para historial aunque eliminen el producto)
+      const prodRes = await client.query(
+        `SELECT sku, nombre FROM productos WHERE id = $1`,
+        [d.producto_id]
+      );
+      const prod = prodRes.rows[0];
+
       await client.query(
         `INSERT INTO movimiento_detalles
-           (movimiento_id, producto_id, cantidad, precio_unitario, precio_tipo, motivo_descuento)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+           (movimiento_id, producto_id, producto_sku, producto_nombre, cantidad, precio_unitario, precio_tipo, motivo_descuento)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
           movimientoId,
           d.producto_id,
+          prod?.sku ?? null,
+          prod?.nombre ?? null,
           d.cantidad,
           d.precio_unitario || null,
-          d.precio_tipo || null,          // 'NORMAL' | 'MAYORISTA' | 'CAJA' | 'DESCUENTO'
+          d.precio_tipo || null, // 'NORMAL' | 'MAYORISTA' | 'CAJA' | 'DESCUENTO'
           d.motivo_descuento || null,
         ]
       );
@@ -218,6 +234,7 @@ router.get('/', async (req, res) => {
          u.nombre  AS usuario,
          m.observacion,
          d.producto_id,
+         COALESCE(p.sku, d.producto_sku) AS producto_sku,
          COALESCE(p.nombre, d.producto_nombre) AS producto,
          d.cantidad,
          d.costo_unitario,

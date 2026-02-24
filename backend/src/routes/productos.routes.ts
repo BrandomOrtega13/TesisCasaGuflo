@@ -403,6 +403,20 @@ router.delete('/:id/hard', async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    // Guardar snapshot del producto en el historial (si aún no está)
+    await client.query(
+      `
+      UPDATE movimiento_detalles d
+      SET
+        producto_sku    = COALESCE(d.producto_sku, p.sku),
+        producto_nombre = COALESCE(d.producto_nombre, p.nombre)
+      FROM productos p
+      WHERE p.id = d.producto_id
+        AND p.id = $1
+      `,
+      [id]
+    );
+
     await client.query('DELETE FROM stock WHERE producto_id = $1', [id]);
 
     const delRes = await client.query('DELETE FROM productos WHERE id = $1', [id]);
