@@ -1067,7 +1067,7 @@ h2{
 /* CARD 1: logo + nombre */
 .auth-brand-card{
   position: absolute;        
-  top: -180px;                
+  top: -140px;                
   left: 50%;
   transform: translateX(-50%);
   
