@@ -117,115 +117,74 @@ CREATE INDEX IF NOT EXISTS idx_mov_tipo_bodega ON movimientos (tipo, bodega_id);
 
 -- 6. Funcion + trigger para mantener stock
 CREATE OR REPLACE FUNCTION aplicar_movimiento_stock()
-RETURNS trigger
-LANGUAGE plpgsql
-AS $func$
+RETURNS trigger AS $$
 DECLARE
-  v_tipo tipo_movimiento;
-  v_bodega UUID;
-  v_factor INT;
-  v_actual NUMERIC(14,3);
-  v_prod UUID;
-  v_delta NUMERIC(14,3);
+  v_tipo            tipo_movimiento;
+  v_bodega          UUID;
+  v_factor          INT;
+  v_cantidad_final  NUMERIC(14,3);
+  v_producto_nombre TEXT;
+  v_bodega_nombre   TEXT;
 BEGIN
-  -- Obtener tipo de movimiento y bodega desde la cabecera
+  -- Tipo y bodega del movimiento padre
   SELECT tipo, bodega_id INTO v_tipo, v_bodega
   FROM movimientos
-  WHERE id = COALESCE(NEW.movimiento_id, OLD.movimiento_id);
+  WHERE id = NEW.movimiento_id;
 
-  -- Determinar factor según el tipo
-  IF v_tipo = 'INGRESO' THEN
-    v_factor := 1;
-  ELSIF v_tipo = 'DESPACHO' THEN
-    v_factor := -1;
-  ELSE
-    v_factor := 1; -- AJUSTE: positivo por defecto
-  END IF;
-
-  -- INSERT
   IF TG_OP = 'INSERT' THEN
-    IF NEW.cantidad IS NULL OR NEW.cantidad <= 0 THEN
-      RAISE EXCEPTION 'Cantidad inválida (INSERT)';
-    END IF;
-
-    v_delta := v_factor * NEW.cantidad;
-    v_prod  := NEW.producto_id;
-
-    INSERT INTO stock (producto_id, bodega_id, cantidad)
-    VALUES (v_prod, v_bodega, v_delta)
-    ON CONFLICT (producto_id, bodega_id)
-    DO UPDATE SET cantidad = stock.cantidad + EXCLUDED.cantidad;
-
-  -- UPDATE
-  ELSIF TG_OP = 'UPDATE' THEN
-    IF NEW.cantidad IS NULL OR NEW.cantidad <= 0 THEN
-      RAISE EXCEPTION 'Cantidad inválida (UPDATE)';
-    END IF;
-
-    IF NEW.producto_id <> OLD.producto_id THEN
-      -- Revertir el efecto del producto viejo
-      INSERT INTO stock (producto_id, bodega_id, cantidad)
-      VALUES (OLD.producto_id, v_bodega, v_factor * (-OLD.cantidad))
-      ON CONFLICT (producto_id, bodega_id)
-      DO UPDATE SET cantidad = stock.cantidad + EXCLUDED.cantidad;
-
-      -- Aplicar efecto al nuevo producto
-      INSERT INTO stock (producto_id, bodega_id, cantidad)
-      VALUES (NEW.producto_id, v_bodega, v_factor * NEW.cantidad)
-      ON CONFLICT (producto_id, bodega_id)
-      DO UPDATE SET cantidad = stock.cantidad + EXCLUDED.cantidad;
-
-      v_prod := NEW.producto_id;
+    -- Definir factor según tipo
+    IF v_tipo = 'INGRESO' THEN
+      v_factor := 1;
+    ELSIF v_tipo = 'DESPACHO' THEN
+      v_factor := -1;
     ELSE
-      -- Mismo producto: calcular delta de cantidad
-      v_delta := v_factor * (NEW.cantidad - OLD.cantidad);
-      v_prod  := NEW.producto_id;
-
-      IF v_delta <> 0 THEN
-        INSERT INTO stock (producto_id, bodega_id, cantidad)
-        VALUES (v_prod, v_bodega, v_delta)
-        ON CONFLICT (producto_id, bodega_id)
-        DO UPDATE SET cantidad = stock.cantidad + EXCLUDED.cantidad;
-      END IF;
+      -- AJUSTE: por ahora positivo
+      v_factor := 1;
     END IF;
 
-  -- DELETE
-  ELSIF TG_OP = 'DELETE' THEN
-    v_prod  := OLD.producto_id;
-    v_delta := v_factor * (-OLD.cantidad);
-
+    -- Actualizar/insertar stock
     INSERT INTO stock (producto_id, bodega_id, cantidad)
-    VALUES (v_prod, v_bodega, v_delta)
+    VALUES (NEW.producto_id, v_bodega, v_factor * NEW.cantidad)
     ON CONFLICT (producto_id, bodega_id)
-    DO UPDATE SET cantidad = stock.cantidad + EXCLUDED.cantidad;
+    DO UPDATE
+      SET cantidad = stock.cantidad + EXCLUDED.cantidad;
+
+    -- Leer cantidad final para validar
+    SELECT cantidad
+    INTO v_cantidad_final
+    FROM stock
+    WHERE producto_id = NEW.producto_id
+      AND bodega_id   = v_bodega;
+
+    IF v_cantidad_final < 0 THEN
+      -- Traer nombres "bonitos"
+      SELECT nombre INTO v_producto_nombre
+      FROM productos
+      WHERE id = NEW.producto_id;
+
+      SELECT nombre INTO v_bodega_nombre
+      FROM bodegas
+      WHERE id = v_bodega;
+
+      RAISE EXCEPTION
+        'Stock negativo para producto % (%), bodega % (%). Cantidad final: %',
+        COALESCE(v_producto_nombre, NEW.producto_id::text),
+        NEW.producto_id,
+        COALESCE(v_bodega_nombre, v_bodega::text),
+        v_bodega,
+        v_cantidad_final;
+    END IF;
+
+    RETURN NEW;
   END IF;
 
-  -- Validación: no permitir stock negativo
-  SELECT cantidad INTO v_actual
-  FROM stock
-  WHERE producto_id = v_prod AND bodega_id = v_bodega;
-
-  IF v_actual < 0 THEN
-    RAISE EXCEPTION 'Stock negativo para producto % en bodega %', v_prod, v_bodega;
-  END IF;
-
-  RETURN COALESCE(NEW, OLD);
+  RETURN NEW;
 END;
-$func$;
+$$ LANGUAGE plpgsql;
 
--- Triggers por operacion
-CREATE TRIGGER trg_aplicar_stock_ins
+-- Triggers
+CREATE TRIGGER trg_mov_det_stock
 AFTER INSERT ON movimiento_detalles
-FOR EACH ROW
-EXECUTE FUNCTION aplicar_movimiento_stock();
-
-CREATE TRIGGER trg_aplicar_stock_upd
-AFTER UPDATE OF cantidad, producto_id ON movimiento_detalles
-FOR EACH ROW
-EXECUTE FUNCTION aplicar_movimiento_stock();
-
-CREATE TRIGGER trg_aplicar_stock_del
-AFTER DELETE ON movimiento_detalles
 FOR EACH ROW
 EXECUTE FUNCTION aplicar_movimiento_stock();
 
@@ -237,6 +196,37 @@ INSERT INTO usuarios (nombre, email, hash_password, rol_id)
 SELECT
   'Admin',
   'admin@casaguflo.local',
-  '$2b$10$REEMPLAZA_ESTE_HASH_BCRYPT_POR_UNO_REAL',
+  '$2b$10$e8sgCQXiBHH12woDU6c/QOb71rEp/8KSnI13x/ksEVUeGUmStK5YC',
   (SELECT id FROM roles WHERE nombre = 'ADMIN')
 WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE email = 'admin@casaguflo.local');
+
+
+-- QUERYS NUEVOS
+-- Productos: nuevos precios y unidades por caja
+ALTER TABLE productos
+  ADD COLUMN IF NOT EXISTS precio_mayorista NUMERIC(12,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS precio_caja      NUMERIC(12,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS unidades_por_caja INT;
+
+-- Tipo para auditar cómo se fijó el precio en los despachos/ingresos
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'precio_tipo') THEN
+    CREATE TYPE precio_tipo AS ENUM ('NORMAL', 'MAYORISTA', 'CAJA', 'DESCUENTO');
+  END IF;
+END$$;
+
+-- Detalle del movimiento: guardar tipo de precio y (opcional) motivo del descuento
+ALTER TABLE movimiento_detalles
+  ADD COLUMN IF NOT EXISTS precio_tipo precio_tipo,
+  ADD COLUMN IF NOT EXISTS motivo_descuento TEXT;
+
+-- Añadir columna activo
+ALTER TABLE proveedores
+  ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE bodegas
+  ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE;
+
+ALTER TABLE clientes
+  ADD COLUMN IF NOT EXISTS activo BOOLEAN NOT NULL DEFAULT TRUE;
