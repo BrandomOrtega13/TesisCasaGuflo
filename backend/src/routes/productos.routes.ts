@@ -132,6 +132,7 @@ router.get('/:id', async (req, res) => {
         p.id,
         p.sku,
         p.nombre,
+        p.categoria_id AS categoria_id,
         c.nombre AS categoria,
         COALESCE(pr.nombre, ult_prov.nombre) AS proveedor,
         p.precio_compra,
@@ -161,6 +162,7 @@ router.get('/:id', async (req, res) => {
       WHERE p.id = $1
       GROUP BY
         p.id,
+        p.categoria_id,
         c.nombre,
         pr.nombre,
         ult_prov.nombre
@@ -303,35 +305,48 @@ router.put('/:id', async (req, res) => {
       });
     }
 
+    // ✅ CLAVE: detectar si "categoria_id" vino en el body (aunque sea null o "")
+    const categoriaProvided = Object.prototype.hasOwnProperty.call(body, 'categoria_id');
+    const categoriaValue =
+      !categoriaProvided ? null : (body.categoria_id ? body.categoria_id : null);
+
     const result = await pool.query(
       `UPDATE productos
        SET
          sku                = COALESCE($1, sku),
          nombre             = COALESCE($2, nombre),
-         categoria_id       = COALESCE($3, categoria_id),
-         proveedor_id       = COALESCE($4, proveedor_id),
-         unidad_id          = COALESCE($5, unidad_id),
-         precio_compra      = COALESCE($6, precio_compra),
-         precio_venta       = COALESCE($7, precio_venta),
-         precio_mayorista   = COALESCE($8, precio_mayorista),
-         precio_caja        = COALESCE($9, precio_caja),
-         unidades_por_caja  = COALESCE($10, unidades_por_caja),
-         activo             = COALESCE($11, activo)
-       WHERE id = $12
+
+         -- ✅ SOLO AQUÍ el cambio:
+         -- si el campo vino, se actualiza (incluye NULL para "sin categoría")
+         -- si NO vino, se mantiene lo actual
+         categoria_id       = CASE WHEN $3 THEN $4 ELSE categoria_id END,
+
+         proveedor_id       = COALESCE($5, proveedor_id),
+         unidad_id          = COALESCE($6, unidad_id),
+         precio_compra      = COALESCE($7, precio_compra),
+         precio_venta       = COALESCE($8, precio_venta),
+         precio_mayorista   = COALESCE($9, precio_mayorista),
+         precio_caja        = COALESCE($10, precio_caja),
+         unidades_por_caja  = COALESCE($11, unidades_por_caja),
+         activo             = COALESCE($12, activo)
+       WHERE id = $13
        RETURNING id, sku, nombre`,
       [
-        body.sku ?? null,
-        body.nombre ?? null,
-        body.categoria_id ?? null,
-        body.proveedor_id ?? null,
-        body.unidad_id ?? null,
-        body.precio_compra ?? null,
-        body.precio_venta ?? null,
-        body.precio_mayorista ?? null,
-        body.precio_caja ?? null,
-        body.unidades_por_caja ?? null,
-        typeof body.activo === 'boolean' ? body.activo : null,
-        id,
+        body.sku ?? null,                         // $1
+        body.nombre ?? null,                      // $2
+
+        categoriaProvided,                        // $3  (boolean)
+        categoriaValue,                           // $4  (uuid o null)
+
+        body.proveedor_id ?? null,                // $5
+        body.unidad_id ?? null,                   // $6
+        body.precio_compra ?? null,               // $7
+        body.precio_venta ?? null,                // $8
+        body.precio_mayorista ?? null,            // $9
+        body.precio_caja ?? null,                 // $10
+        body.unidades_por_caja ?? null,           // $11
+        typeof body.activo === 'boolean' ? body.activo : null, // $12
+        id,                                       // $13
       ]
     );
 

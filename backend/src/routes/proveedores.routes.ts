@@ -10,49 +10,20 @@ const pool = new Pool({
 // ======================
 // Helpers
 // ======================
-const onlyDigits = (s: any) => String(s ?? '').replace(/\D/g, '').trim();
 
-const isValidEmailFormat = (email: string) => {
-  // formato básico suficiente para backend
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+// Permite: + al inicio (opcional) + números + espacios + guiones + paréntesis
+const normalizePhone = (raw: any) => {
+  const s = String(raw ?? '').trim();
+  const cleaned = s.replace(/[^\d+\s()-]/g, '');
+  const plusFixed = cleaned.replace(/\+/g, (_m, idx) => (idx === 0 ? '+' : ''));
+  return plusFixed;
 };
 
-/**
- * Validación por API (opcional)
- * ZeroBounce Email Validation
- * ENV: ZEROBOUNCE_API_KEY
- *
- * Si no existe la key => no bloquea (solo valida formato).
- * docs: https://zerobounce.net/docs/email-validation-api-quickstart/
- */
-const validateEmailByAPI = async (email: string): Promise<boolean> => {
-  try {
-    const key = process.env.ZEROBOUNCE_API_KEY;
-    if (!key) return true;
-
-    const url = `https://api.zerobounce.net/v2/validate?api_key=${encodeURIComponent(
-      key
-    )}&email=${encodeURIComponent(email)}`;
-
-    const resp = await fetch(url);
-    if (!resp.ok) return true; // si falla, no bloquear
-
-    const data: any = await resp.json();
-    const status = String(data?.status ?? '').toLowerCase();
-
-    // status: valid | invalid | catch-all | unknown | spamtrap | abuse | do_not_mail
-    if (status === 'valid') return true;
-
-    // todo lo demás lo consideramos "no válido" para tu caso
-    return false;
-  } catch {
-    return true;
-  }
-};
+const digitsCount = (raw: any) => String(raw ?? '').replace(/\D/g, '').trim().length;
 
 /**
  * GET /proveedores
- * Proveedores activos (sirve para selects y para la pestaña principal)
+ * Proveedores activos
  */
 router.get('/', async (_req, res) => {
   try {
@@ -121,31 +92,22 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: 'El nombre es obligatorio' });
     }
 
-    const contactoDigits = onlyDigits(contacto);
-    if (!contactoDigits || contactoDigits.length < 10) {
+    const contactoClean = normalizePhone(contacto);
+    if (!contactoClean || digitsCount(contactoClean) < 10) {
       return res.status(400).json({
         message: 'El contacto celular es obligatorio y debe tener mínimo 10 dígitos',
       });
     }
 
-    const telefonoDigits = onlyDigits(telefono);
-    if (telefonoDigits && telefonoDigits.length > 0 && telefonoDigits.length < 9) {
+    const telefonoClean = normalizePhone(telefono);
+    if (telefonoClean && digitsCount(telefonoClean) > 0 && digitsCount(telefonoClean) < 9) {
       return res.status(400).json({
         message: 'El teléfono local debe tener mínimo 9 dígitos (o dejarlo vacío)',
       });
     }
 
+    // correo: SE ACEPTA SIN VALIDAR (puede venir vacío o cualquier string)
     const correoClean = String(correo ?? '').trim();
-    if (correoClean) {
-      if (!isValidEmailFormat(correoClean)) {
-        return res.status(400).json({ message: 'El correo no tiene un formato válido' });
-      }
-
-      const ok = await validateEmailByAPI(correoClean);
-      if (!ok) {
-        return res.status(400).json({ message: 'El correo no existe o no es válido' });
-      }
-    }
 
     // ===== INSERT =====
     const r = await pool.query(
@@ -154,8 +116,8 @@ router.post('/', async (req, res) => {
        RETURNING id, nombre`,
       [
         String(nombre).trim(),
-        contactoDigits,
-        telefonoDigits || null,
+        contactoClean,
+        telefonoClean || null,
         correoClean || null,
       ]
     );
@@ -180,59 +142,71 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ message: 'El nombre no puede estar vacío' });
     }
 
-    // contacto obligatorio en tu proyecto (mínimo 10)
-    // si viene, validarlo
-    const contactoDigits =
-      contacto === undefined ? undefined : onlyDigits(contacto);
+    // contacto obligatorio (mínimo 10 dígitos) si viene en el payload
+    const contactoClean = contacto === undefined ? undefined : normalizePhone(contacto);
 
-    if (contactoDigits !== undefined) {
-      if (!contactoDigits || contactoDigits.length < 10) {
+    if (contactoClean !== undefined) {
+      if (!contactoClean || digitsCount(contactoClean) < 10) {
         return res.status(400).json({
           message: 'El contacto celular es obligatorio y debe tener mínimo 10 dígitos',
         });
       }
     }
 
-    const telefonoDigits =
-      telefono === undefined ? undefined : onlyDigits(telefono);
+    const telefonoClean = telefono === undefined ? undefined : normalizePhone(telefono);
 
-    if (telefonoDigits !== undefined) {
-      if (telefonoDigits && telefonoDigits.length > 0 && telefonoDigits.length < 9) {
+    if (telefonoClean !== undefined) {
+      if (telefonoClean && digitsCount(telefonoClean) > 0 && digitsCount(telefonoClean) < 9) {
         return res.status(400).json({
           message: 'El teléfono local debe tener mínimo 9 dígitos (o dejarlo vacío)',
         });
       }
     }
 
+    // correo: SIN VALIDAR (si viene vacío => null)
     const correoClean = correo === undefined ? undefined : String(correo ?? '').trim();
 
-    if (correoClean !== undefined && correoClean) {
-      if (!isValidEmailFormat(correoClean)) {
-        return res.status(400).json({ message: 'El correo no tiene un formato válido' });
-      }
-
-      const ok = await validateEmailByAPI(correoClean);
-      if (!ok) {
-        return res.status(400).json({ message: 'El correo no existe o no es válido' });
-      }
-    }
-
     // ===== UPDATE =====
+    // FIX: permitir borrar telefono/correo cuando llegan como "" (o null) en el PUT
+    const telefonoProvided = telefono !== undefined;
+    const correoProvided = correo !== undefined;
+
     const r = await pool.query(
       `UPDATE proveedores
        SET
          nombre   = COALESCE($1, nombre),
          contacto = COALESCE($2, contacto),
-         telefono = COALESCE($3, telefono),
-         correo   = COALESCE($4, correo),
-         activo   = COALESCE($5, activo)
-       WHERE id = $6
-       RETURNING id, nombre`,
+
+         -- si enviaron "telefono" en el payload:
+         --   - "" -> NULL (borra)
+         --   - "023..." -> guarda
+         -- si NO enviaron telefono -> mantiene lo actual
+         telefono = CASE
+                    WHEN $3 THEN $4
+                    ELSE telefono
+                  END,
+
+         -- igual para correo
+         correo   = CASE
+                    WHEN $5 THEN $6
+                    ELSE correo
+                  END,
+
+         activo   = COALESCE($7, activo)
+       WHERE id = $8
+       RETURNING id, nombre, contacto, telefono, correo`,
       [
         nombre !== undefined ? String(nombre).trim() : null,
-        contactoDigits !== undefined ? contactoDigits : null,
-        telefonoDigits !== undefined ? (telefonoDigits || null) : null,
-        correoClean !== undefined ? (correoClean || null) : null,
+        contactoClean !== undefined ? contactoClean : null,
+
+        // telefono
+        telefonoProvided,                         // $3
+        telefonoClean ? telefonoClean : null,     // $4  (si "" => null)
+
+        // correo
+        correoProvided,                           // $5
+        correoClean ? correoClean : null,         // $6  (si "" => null)
+
         typeof activo === 'boolean' ? activo : null,
         id,
       ]

@@ -9,6 +9,13 @@ type FormState = {
   correo: string;
 };
 
+const normalizePhone = (raw: string) => {
+  const s = (raw ?? '').trim();
+  const cleaned = s.replace(/[^\d+\s()-]/g, '');
+  const plusFixed = cleaned.replace(/\+/g, (_m, idx) => (idx === 0 ? '+' : ''));
+  return plusFixed;
+};
+
 export default function ProveedorForm() {
   const { id } = useParams<{ id: string }>();
   const isNew = id === 'nuevo';
@@ -62,10 +69,17 @@ export default function ProveedorForm() {
         return;
       }
 
+      const payload = {
+        nombre: form.nombre.trim(),
+        contacto: normalizePhone(form.contacto),
+        telefono: normalizePhone(form.telefono),
+        correo: (form.correo ?? '').trim(), // SIN validar correo
+      };
+
       if (isNew) {
-        await api.post('/proveedores', form);
+        await api.post('/proveedores', payload);
       } else if (id) {
-        await api.put(`/proveedores/${id}`, form);
+        await api.put(`/proveedores/${id}`, payload);
       }
 
       navigate('/proveedores');
@@ -111,6 +125,7 @@ export default function ProveedorForm() {
               value={form.contacto}
               onChange={onChange}
               className="form-input"
+              placeholder="Ej: +593 99 123 4567"
             />
           </div>
 
@@ -121,6 +136,7 @@ export default function ProveedorForm() {
               value={form.telefono}
               onChange={onChange}
               className="form-input"
+              placeholder="Ej: (02) 234-5678"
             />
           </div>
 
@@ -131,6 +147,8 @@ export default function ProveedorForm() {
               value={form.correo}
               onChange={onChange}
               className="form-input"
+              type="text"
+              placeholder="Opcional"
             />
           </div>
 

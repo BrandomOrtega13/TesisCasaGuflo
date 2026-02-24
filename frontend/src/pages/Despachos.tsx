@@ -433,7 +433,7 @@ export default function Despachos() {
                         onChange={(e) => onChangePrecioTipo(i, e.target.value as PrecioTipo)}
                         className="form-select"
                       >
-                        <option value="NORMAL">Venta</option>
+                        <option value="NORMAL">Unitario</option>
                         <option value="MAYORISTA">Mayorista</option>
                         <option value="CAJA">Caja</option>
                         <option value="DESCUENTO">Descuento</option>
@@ -475,8 +475,16 @@ export default function Despachos() {
                         placeholder="0.00"
                         value={d.precio_unitario ?? ''}
                         onChange={(e) => {
-                          if (isReadOnlyPrice(d.precio_tipo)) return;
-                          updateDetalle(i, { precio_unitario: Number(e.target.value) || 0 });
+                        if (isReadOnlyPrice(d.precio_tipo)) return;
+
+                        const v = e.target.value;
+                        if (v === '') {
+                          updateDetalle(i, { precio_unitario: undefined });
+                          return;
+                        }
+
+                        const n = Number(v);
+                        updateDetalle(i, { precio_unitario: Number.isFinite(n) ? n : undefined });
                         }}
                         className="form-input"
                         readOnly={isReadOnlyPrice(d.precio_tipo)}

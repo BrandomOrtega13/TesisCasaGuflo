@@ -9,12 +9,15 @@ const pool = new Pool({
 
 /**
  * POST /movimientos/ingresos
+ * ✅ Ahora permite bodega por línea:
+ * - Si hay varias bodegas en los detalles, crea 1 movimiento por bodega.
+ * - Mantiene compatibilidad con bodega_id en cabecera (fallback).
  */
 router.post('/ingresos', async (req, res) => {
   const client = await pool.connect();
   try {
     const {
-      bodega_id,
+      bodega_id, // fallback opcional
       proveedor_id,
       usuario_id,
       fecha,
@@ -22,53 +25,87 @@ router.post('/ingresos', async (req, res) => {
       detalles,
     } = req.body;
 
-    if (!bodega_id || !Array.isArray(detalles) || detalles.length === 0) {
+    if (!Array.isArray(detalles) || detalles.length === 0) {
       return res.status(400).json({
-        message: 'bodega_id y al menos un detalle son obligatorios',
+        message: 'al menos un detalle es obligatorio',
+      });
+    }
+
+    // Normaliza + valida detalles
+    const limpios = detalles
+      .filter((d: any) => d?.producto_id && Number(d?.cantidad) > 0)
+      .map((d: any) => ({
+        producto_id: d.producto_id,
+        cantidad: Number(d.cantidad),
+        costo_unitario: d.costo_unitario ?? null,
+        bodega_id: d.bodega_id || bodega_id || null, // ✅ por línea o fallback
+      }));
+
+    if (limpios.length === 0) {
+      return res.status(400).json({ message: 'Detalles inválidos en ingreso' });
+    }
+
+    if (limpios.some((d: any) => !d.bodega_id)) {
+      return res.status(400).json({
+        message: 'Cada detalle debe incluir bodega_id (o enviar bodega_id en cabecera)',
       });
     }
 
     await client.query('BEGIN');
 
-    const movRes = await client.query(
-      `INSERT INTO movimientos
-         (tipo, fecha, bodega_id, proveedor_id, usuario_id, observacion)
-       VALUES
-         ('INGRESO',
-          COALESCE($1::timestamptz, now()),
-          $2, $3, $4, $5)
-       RETURNING id`,
-      [
-        fecha || null,
-        bodega_id,
-        proveedor_id || null,
-        usuario_id || null,
-        observacion || null,
-      ]
-    );
+    // Agrupa por bodega para crear 1 movimiento por bodega
+    const grupos = new Map<string, any[]>();
+    for (const d of limpios) {
+      const key = String(d.bodega_id);
+      if (!grupos.has(key)) grupos.set(key, []);
+      grupos.get(key)!.push(d);
+    }
 
-    const movimientoId = movRes.rows[0].id;
+    const ids: string[] = [];
 
-    for (const d of detalles) {
-      if (!d.producto_id || !d.cantidad || d.cantidad <= 0) {
-        throw new Error('Detalle inválido en ingreso');
-      }
-
-      await client.query(
-        `INSERT INTO movimiento_detalles
-           (movimiento_id, producto_id, cantidad, costo_unitario)
-         VALUES ($1, $2, $3, $4)`,
-        [movimientoId, d.producto_id, d.cantidad, d.costo_unitario || null]
+    for (const [bodegaLineaId, items] of grupos.entries()) {
+      const movRes = await client.query(
+        `INSERT INTO movimientos
+           (tipo, fecha, bodega_id, proveedor_id, usuario_id, observacion)
+         VALUES
+           ('INGRESO',
+            COALESCE($1::timestamptz, now()),
+            $2, $3, $4, $5)
+         RETURNING id`,
+        [
+          fecha || null,
+          bodegaLineaId,
+          proveedor_id || null,
+          usuario_id || null,
+          observacion || null,
+        ]
       );
-      // Trigger suma stock
+
+      const movimientoId = movRes.rows[0].id;
+      ids.push(movimientoId);
+
+      for (const d of items) {
+        await client.query(
+          `INSERT INTO movimiento_detalles
+             (movimiento_id, producto_id, cantidad, costo_unitario)
+           VALUES ($1, $2, $3, $4)`,
+          [movimientoId, d.producto_id, d.cantidad, d.costo_unitario]
+        );
+        // Trigger suma stock
+      }
     }
 
     await client.query('COMMIT');
-    res.status(201).json({ id: movimientoId, message: 'Ingreso registrado' });
+    return res.status(201).json({
+      ids,
+      message: grupos.size > 1
+        ? 'Ingresos registrados por bodega'
+        : 'Ingreso registrado',
+    });
   } catch (err: any) {
     await client.query('ROLLBACK');
     console.error('Error en POST /movimientos/ingresos:', err.message || err);
-    res.status(500).json({ message: 'Error al registrar ingreso' });
+    return res.status(500).json({ message: 'Error al registrar ingreso' });
   } finally {
     client.release();
   }

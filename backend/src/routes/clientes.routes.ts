@@ -109,7 +109,7 @@ const normalizeAndValidateIdent = (identificacion: any) => {
 
 /**
  * GET /clientes
- * Solo activos (para selects y lista principal)
+ * Solo activos
  */
 router.get('/', async (_req, res) => {
   try {
@@ -216,6 +216,8 @@ router.post('/', async (req, res) => {
 
 /**
  * PUT /clientes/:id
+ * ✅ FIX: permite borrar telefono/correo (enviando "" -> NULL)
+ * ✅ Si no se manda el campo (undefined) no se toca
  */
 router.put('/:id', async (req, res) => {
   try {
@@ -244,10 +246,16 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ message: 'El nombre no puede estar vacío' });
     }
 
-    const telefonoDigits = telefono === undefined ? undefined : onlyDigits(telefono);
-    const correoClean = correo === undefined ? undefined : String(correo ?? '').trim();
+    // ====== ✅ CLAVE: SI VIENE VACÍO -> NULL (BORRAR) ======
+    const telefonoProvided = telefono !== undefined;
+    const telefonoDigits = telefonoProvided ? onlyDigits(telefono) : undefined;
+    const telefonoValue = telefonoProvided ? (telefonoDigits ? telefonoDigits : null) : undefined;
 
-    if (correoClean !== undefined && correoClean) {
+    const correoProvided = correo !== undefined;
+    const correoClean = correoProvided ? String(correo ?? '').trim() : undefined;
+
+    // Mantengo tu validación EXACTA: solo si viene y NO está vacío
+    if (correoProvided && correoClean) {
       if (!isValidEmailFormat(correoClean)) {
         return res.status(400).json({ message: 'El correo no tiene un formato válido' });
       }
@@ -258,16 +266,26 @@ router.put('/:id', async (req, res) => {
        SET
          identificacion = COALESCE($1, identificacion),
          nombre         = COALESCE($2, nombre),
-         telefono       = COALESCE($3, telefono),
-         correo         = COALESCE($4, correo),
-         activo         = COALESCE($5, activo)
-       WHERE id = $6
+
+         -- ✅ si telefono fue enviado, lo actualizo (puede ser NULL para borrar)
+         telefono       = CASE WHEN $3 THEN $4 ELSE telefono END,
+
+         -- ✅ si correo fue enviado, lo actualizo (puede ser NULL para borrar)
+         correo         = CASE WHEN $5 THEN $6 ELSE correo END,
+
+         activo         = COALESCE($7, activo)
+       WHERE id = $8
        RETURNING id, nombre`,
       [
         ident !== undefined ? ident.ident : null,
         nombre !== undefined ? String(nombre).trim() : null,
-        telefonoDigits !== undefined ? (telefonoDigits || null) : null,
-        correoClean !== undefined ? (correoClean || null) : null,
+
+        telefonoProvided, // $3
+        telefonoProvided ? telefonoValue : null, // $4
+
+        correoProvided, // $5
+        correoProvided ? (correoClean ? correoClean : null) : null, // $6
+
         typeof activo === 'boolean' ? activo : null,
         id,
       ]

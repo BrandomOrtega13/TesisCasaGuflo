@@ -8,7 +8,16 @@ type FormState = {
   correo: string;
 };
 
-const onlyDigits = (s: string) => (s ?? '').replace(/\D/g, '');
+// Permite: + al inicio (opcional) + números + espacios + guiones + paréntesis
+const normalizePhone = (raw: string) => {
+  const s = (raw ?? '').trim();
+  const cleaned = s.replace(/[^\d+\s()-]/g, '');
+  const plusFixed = cleaned.replace(/\+/g, (_m, idx) => (idx === 0 ? '+' : ''));
+  return plusFixed;
+};
+
+// Cuenta dígitos reales para validación (ignora +, espacios, guiones, etc.)
+const digitsCount = (raw: string) => (raw ?? '').replace(/\D/g, '').length;
 
 export default function ProveedorFormModal({
   open,
@@ -87,12 +96,11 @@ export default function ProveedorFormModal({
     setLoading(true);
     setMsg(null);
 
-    // Limpieza (para permitir espacios/guiones en números)
     const payload = {
       nombre: form.nombre.trim(),
-      contacto: onlyDigits(form.contacto),
-      telefono: onlyDigits(form.telefono),
-      correo: form.correo.trim(),
+      contacto: normalizePhone(form.contacto),
+      telefono: normalizePhone(form.telefono),
+      correo: form.correo.trim(), // SIN validar correo
     };
 
     try {
@@ -102,33 +110,31 @@ export default function ProveedorFormModal({
         return;
       }
 
-      // contacto: obligatorio, mínimo 10 dígitos
-      if (!payload.contacto || payload.contacto.length < 10) {
+      // contacto: obligatorio, mínimo 10 dígitos (pero permite +, espacios, etc.)
+      if (!payload.contacto || digitsCount(payload.contacto) < 10) {
         setMsg('Error: El contacto celular es obligatorio y debe tener mínimo 10 dígitos');
         setLoading(false);
         return;
       }
 
       // telefono: opcional, si viene debe ser mínimo 9 dígitos
-      if (payload.telefono && payload.telefono.length < 9) {
+      if (payload.telefono && digitsCount(payload.telefono) < 9) {
         setMsg('Error: El teléfono local debe tener mínimo 9 dígitos (o dejarlo vacío)');
         setLoading(false);
         return;
       }
 
-      // correo: opcional (el type="email" ya valida formato básico)
       if (isNew) {
         await api.post('/proveedores', payload);
       } else {
         await api.put(`/proveedores/${proveedorId}`, payload);
       }
 
-      onSaved(); // refresca lista
-      onClose(); // cierra modal
+      onSaved();
+      onClose();
     } catch (err: any) {
       console.error(err);
       const m = err?.response?.data?.message || 'Error: No se pudo guardar el proveedor';
-      // Asegurar prefijo para que se pinte como error
       setMsg(String(m).startsWith('Error') ? m : `Error: ${m}`);
     } finally {
       setLoading(false);
@@ -190,24 +196,14 @@ export default function ProveedorFormModal({
               </div>
 
               <div className="form-field">
-                <label className="form-label">Contacto Celular</label>
+                <label className="form-label">Contacto Celular *</label>
                 <input
                   name="contacto"
                   value={form.contacto}
                   onChange={onChange}
                   className="form-input"
-                  inputMode="numeric"
                   required
-                  pattern="[0-9]{10,}"
-                  minLength={10}
-                  title="El contacto celular es obligatorio y debe tener mínimo 10 dígitos"
-                  onInvalid={(e) =>
-                    (e.currentTarget as HTMLInputElement).setCustomValidity(
-                      'El contacto celular es obligatorio y debe tener mínimo 10 dígitos'
-                    )    
-                  }
-                  onInput={(e) => (e.currentTarget as HTMLInputElement).setCustomValidity('')}
-                  placeholder="Obligatorio (mínimo 10 dígitos)"
+                  placeholder="Obligatorio, mínimo 10 dígitos"
                 />
               </div>
 
@@ -218,17 +214,7 @@ export default function ProveedorFormModal({
                   value={form.telefono}
                   onChange={onChange}
                   className="form-input"
-                  inputMode="numeric"
-                  pattern="[0-9]{9,}"
-                  minLength={9}
-                  title="El teléfono local debe tener mínimo 9 dígitos (o déjalo vacío)"
-                  onInvalid={(e) =>
-                    (e.currentTarget as HTMLInputElement).setCustomValidity(
-                      'El teléfono local debe tener mínimo 9 dígitos (o déjalo vacío)'
-                    )
-                  }
-                  onInput={(e) => (e.currentTarget as HTMLInputElement).setCustomValidity('')}
-                  placeholder="Opcional (mínimo 9 dígitos)"
+                  placeholder="Opcional, mínimo 9 dígitos"
                 />
               </div>
 
@@ -239,7 +225,7 @@ export default function ProveedorFormModal({
                   value={form.correo}
                   onChange={onChange}
                   className="form-input"
-                  type="email"
+                  type="text"
                   placeholder="Opcional"
                   autoComplete="email"
                 />

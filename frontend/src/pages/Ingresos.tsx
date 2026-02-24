@@ -7,6 +7,7 @@ type Producto = { id: string; sku: string; nombre: string };
 type Detalle = {
   producto_id: string;
   cantidad: number;
+  bodega_id: string; // bodega por línea
 };
 
 export default function Ingresos() {
@@ -14,9 +15,9 @@ export default function Ingresos() {
   const [proveedores, setProveedores] = useState<Opcion[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
 
-  const defaultDetalle: Detalle = { producto_id: "", cantidad: 0 };
+  const defaultDetalle: Detalle = { producto_id: "", cantidad: 0, bodega_id: "" };
 
-  const [bodegaId, setBodegaId] = useState("");
+  const [bodegaId, setBodegaId] = useState(""); // bodega por defecto
   const [proveedorId, setProveedorId] = useState("");
   const [observacion, setObservacion] = useState("");
   const [detalles, setDetalles] = useState<Detalle[]>([{ ...defaultDetalle }]);
@@ -29,6 +30,7 @@ export default function Ingresos() {
   const [searchProveedor, setSearchProveedor] = useState("");
   const [searchProducto, setSearchProducto] = useState("");
 
+  // Cargar catálogos
   useEffect(() => {
     const load = async () => {
       try {
@@ -56,6 +58,15 @@ export default function Ingresos() {
     load();
   }, []);
 
+  // Autocompletar bodega en líneas vacías
+  useEffect(() => {
+    if (!bodegaId) return;
+
+    setDetalles((prev) =>
+      prev.map((d) => (d.bodega_id ? d : { ...d, bodega_id: bodegaId })),
+    );
+  }, [bodegaId]);
+
   const updateDetalle = (index: number, patch: Partial<Detalle>) => {
     setDetalles((prev) =>
       prev.map((d, i) => (i === index ? { ...d, ...patch } : d)),
@@ -63,12 +74,15 @@ export default function Ingresos() {
   };
 
   const addDetalle = () =>
-    setDetalles((prev) => [...prev, { ...defaultDetalle }]);
+    setDetalles((prev) => [
+      ...prev,
+      { ...defaultDetalle, bodega_id: bodegaId || "" },
+    ]);
 
   const removeDetalle = (index: number) =>
     setDetalles((prev) => prev.filter((_, i) => i !== index));
 
-  // ---- LISTAS FILTRADAS (manteniendo el seleccionado) ----
+  // ---- LISTAS FILTRADAS ----
   const bodegasFiltradasBase = bodegas.filter((b) =>
     b.nombre.toLowerCase().includes(searchBodega.toLowerCase()),
   );
@@ -116,16 +130,23 @@ export default function Ingresos() {
         .map((d) => ({
           producto_id: d.producto_id,
           cantidad: d.cantidad,
+          bodega_id: d.bodega_id || bodegaId || "",
         }));
 
-      if (!bodegaId || limpios.length === 0) {
-        setMsg("Seleccione bodega y al menos un producto con cantidad > 0");
+      if (limpios.length === 0) {
+        setMsg("Ingrese al menos un producto con cantidad > 0");
+        setLoading(false);
+        return;
+      }
+
+      if (limpios.some((d) => !d.bodega_id)) {
+        setMsg("Seleccione bodega en cada línea.");
         setLoading(false);
         return;
       }
 
       await api.post("/movimientos/ingresos", {
-        bodega_id: bodegaId,
+        bodega_id: bodegaId || null,
         proveedor_id: proveedorId || null,
         observacion: observacion?.trim() || null,
         detalles: limpios,
@@ -150,7 +171,6 @@ export default function Ingresos() {
 
   return (
     <div className="page mov-page">
-      {/* Header en card */}
       <div className="card page-head-card">
         <div className="page-header" style={{ alignItems: "flex-start" }}>
           <div>
@@ -187,7 +207,6 @@ export default function Ingresos() {
         )}
       </div>
 
-      {/* Form en card grande */}
       <div className="form-card-wide">
         <form onSubmit={onSubmit}>
           {/* Cabecera */}
@@ -196,20 +215,23 @@ export default function Ingresos() {
 
             <div className="grid-2">
               <div className="form-field">
-                <label className="form-label">Bodega</label>
+                <label className="form-label">
+                  Bodega por defecto (opcional)
+                </label>
+
                 <input
                   placeholder="Buscar bodega..."
                   value={searchBodega}
                   onChange={(e) => setSearchBodega(e.target.value)}
                   className="form-input"
                 />
+
                 <select
                   value={bodegaId}
                   onChange={(e) => setBodegaId(e.target.value)}
-                  required
                   className="form-select"
                 >
-                  <option value="">Seleccione bodega</option>
+                  <option value="">Seleccione bodega por defecto</option>
                   {bodegasFiltradas.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.nombre}
@@ -220,12 +242,14 @@ export default function Ingresos() {
 
               <div className="form-field">
                 <label className="form-label">Proveedor (opcional)</label>
+
                 <input
                   placeholder="Buscar proveedor..."
                   value={searchProveedor}
                   onChange={(e) => setSearchProveedor(e.target.value)}
                   className="form-input"
                 />
+
                 <select
                   value={proveedorId}
                   onChange={(e) => setProveedorId(e.target.value)}
@@ -281,32 +305,10 @@ export default function Ingresos() {
               })();
 
               return (
-                <div
-                  key={i}
-                  className="inline-card"
-                  style={{ marginBottom: 12 }}
-                >
+                <div key={i} className="inline-card" style={{ marginBottom: 12 }}>
                   <div className="grid-2">
                     <div className="form-field">
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          flexWrap: "wrap",
-                        }}
-                      >
-                        <label className="form-label" style={{ margin: 0 }}>
-                          Producto
-                        </label>
-
-                        {Number(d.cantidad) === 0 && (
-                          <span className="hint-info">
-                            ℹ️ Si la cantidad es 0, este producto no se
-                            registrará en el ingreso.
-                          </span>
-                        )}
-                      </div>
+                      <label className="form-label">Producto</label>
 
                       <select
                         value={d.producto_id}
@@ -342,6 +344,27 @@ export default function Ingresos() {
                     </div>
                   </div>
 
+                  {/* Bodega por línea */}
+                  <div className="form-field" style={{ marginTop: 10 }}>
+                    <label className="form-label">Bodega (por línea)</label>
+
+                    <select
+                      value={d.bodega_id || ""}
+                      onChange={(e) =>
+                        updateDetalle(i, { bodega_id: e.target.value })
+                      }
+                      required
+                      className="form-select"
+                    >
+                      <option value="">Seleccione bodega</option>
+                      {bodegas.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div
                     style={{
                       display: "flex",
@@ -375,7 +398,6 @@ export default function Ingresos() {
             </div>
           </div>
 
-          {/* Acciones */}
           <div className="actions-bar">
             <button type="submit" disabled={loading} className="btn-primary">
               {loading ? "Guardando..." : "Registrar ingreso"}

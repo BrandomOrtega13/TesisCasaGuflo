@@ -8,6 +8,16 @@ type FormState = {
   correo: string;
 };
 
+// Permite: + (solo al inicio) + números + espacios + guiones + paréntesis
+const normalizePhone = (raw: any) => {
+  const s = String(raw ?? "").trim();
+  const cleaned = s.replace(/[^\d+\s()-]/g, "");
+  const plusFixed = cleaned.replace(/\+/g, (_m, idx) => (idx === 0 ? "+" : ""));
+  return plusFixed;
+};
+
+const digitsCount = (raw: any) => String(raw ?? "").replace(/\D/g, "").trim().length;
+
 export default function ClienteFormModal({
   open,
   clienteId,
@@ -81,17 +91,38 @@ export default function ClienteFormModal({
     setLoading(true);
     setMsg(null);
 
+    // Limpieza para teléfono
+    const telefonoClean = normalizePhone(form.telefono);
+    const telefonoDigits = digitsCount(telefonoClean);
+
+    // payload que enviamos
+    const payload = {
+      identificacion: form.identificacion,
+      nombre: form.nombre.trim(),
+      // si el teléfono queda vacío => enviamos ""
+      telefono: telefonoClean,
+      // correo sin validar
+      correo: String(form.correo ?? "").trim(),
+    };
+
     try {
-      if (!form.nombre.trim()) {
+      if (!payload.nombre) {
         setMsg("El nombre es obligatorio");
         setLoading(false);
         return;
       }
 
+      // Teléfono: opcional, pero si viene debe tener mínimo 10 dígitos
+      if (payload.telefono && telefonoDigits > 0 && telefonoDigits < 10) {
+        setMsg("El teléfono debe tener mínimo 10 dígitos (o dejarlo vacío)");
+        setLoading(false);
+        return;
+      }
+
       if (isNew) {
-        await api.post("/clientes", form);
+        await api.post("/clientes", payload);
       } else {
-        await api.put(`/clientes/${clienteId}`, form);
+        await api.put(`/clientes/${clienteId}`, payload);
       }
 
       onSaved();
@@ -107,7 +138,7 @@ export default function ClienteFormModal({
 
   if (!open) return null;
 
-  return !open ? null : (
+  return (
     <div className="modal-overlay" onMouseDown={onClose}>
       <div
         className="modal-card"
@@ -116,16 +147,9 @@ export default function ClienteFormModal({
         aria-modal="true"
       >
         <div className="modal-head">
-          <div className="modal-title">
-            {isNew ? "Nuevo cliente" : "Editar cliente"}
-          </div>
+          <div className="modal-title">{isNew ? "Nuevo cliente" : "Editar cliente"}</div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="modal-close"
-            aria-label="Cerrar"
-          >
+          <button type="button" onClick={onClose} className="modal-close" aria-label="Cerrar">
             ✕
           </button>
         </div>
@@ -138,9 +162,7 @@ export default function ClienteFormModal({
               <p
                 className={
                   "form-message " +
-                  (msg.includes("Error")
-                    ? "form-message-error"
-                    : "form-message-success")
+                  (msg.includes("Error") ? "form-message-error" : "form-message-success")
                 }
               >
                 {msg}
@@ -149,12 +171,14 @@ export default function ClienteFormModal({
 
             <form onSubmit={onSubmit} className="form-grid">
               <div className="form-field">
-                <label className="form-label">Identificación</label>
+                <label className="form-label">Cédula o RUC *</label>
                 <input
                   className="form-input"
                   name="identificacion"
                   value={form.identificacion}
                   onChange={onChange}
+                  required
+                  placeholder="Ingrese numero de cedula o RUC del cliente"
                 />
               </div>
 
@@ -166,16 +190,18 @@ export default function ClienteFormModal({
                   value={form.nombre}
                   onChange={onChange}
                   required
+                  placeholder="Ingrese el nombre del cliente"
                 />
               </div>
 
               <div className="form-field">
-                <label className="form-label">Teléfono</label>
+                <label className="form-label">Contacto celular</label>
                 <input
                   className="form-input"
                   name="telefono"
                   value={form.telefono}
                   onChange={onChange}
+                  placeholder="Opcional, mínimo 10 dígitos"
                 />
               </div>
 
@@ -186,22 +212,15 @@ export default function ClienteFormModal({
                   name="correo"
                   value={form.correo}
                   onChange={onChange}
+                  placeholder="Opcional"
                 />
               </div>
 
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button
-                  className="btn-primary"
-                  type="submit"
-                  disabled={loading}
-                >
+                <button className="btn-primary" type="submit" disabled={loading}>
                   {loading ? "Guardando..." : "Guardar"}
                 </button>
-                <button
-                  className="btn-secondary"
-                  type="button"
-                  onClick={onClose}
-                >
+                <button className="btn-secondary" type="button" onClick={onClose}>
                   Cancelar
                 </button>
               </div>
