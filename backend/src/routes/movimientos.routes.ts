@@ -218,7 +218,7 @@ router.get('/', async (req, res) => {
          u.nombre  AS usuario,
          m.observacion,
          d.producto_id,
-         p.nombre  AS producto,
+         COALESCE(p.nombre, d.producto_nombre) AS producto,
          d.cantidad,
          d.costo_unitario,
          d.precio_unitario,
@@ -230,7 +230,7 @@ router.get('/', async (req, res) => {
        LEFT JOIN clientes cl ON cl.id = m.cliente_id
        LEFT JOIN usuarios u ON u.id = m.usuario_id
        INNER JOIN movimiento_detalles d ON d.movimiento_id = m.id
-       INNER JOIN productos p ON p.id = d.producto_id
+       LEFT JOIN productos p ON p.id = d.producto_id
        ${whereSql}
        ORDER BY m.fecha DESC, m.id DESC`,
       params
