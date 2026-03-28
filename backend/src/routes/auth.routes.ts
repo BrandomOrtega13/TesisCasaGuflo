@@ -1,14 +1,9 @@
 import { Router } from 'express';
-import { Pool } from 'pg';
+import { pool } from '../config/db';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
-
-// Conexión a la base usando la variable del .env
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 router.post('/login', async (req, res) => {
   try {

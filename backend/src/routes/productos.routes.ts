@@ -1,11 +1,7 @@
 import { Router } from 'express';
-import { Pool } from 'pg';
+import { pool } from '../config/db';
 
 const router = Router();
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
 
 /**
  * GET /productos
