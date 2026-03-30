@@ -15,8 +15,11 @@ const app = express();
 
 // Habilitar CORS para el frontend
 app.use(cors({
-  origin: 'http://localhost:3000',
-  credentials: false,
+  origin: [
+    'http://localhost:3000',
+    'https://kardex-pro-casaguflo.vercel.app'
+  ],
+  credentials: true,
 }));
 
 app.use(express.json());
